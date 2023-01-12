@@ -5,6 +5,7 @@ try:
     from pytorch_lightning import Trainer, seed_everything
     from pathlib import Path
     import numpy as np
+    from lib.lib_utils import Utils
 
 except Exception as e:
 
@@ -50,18 +51,28 @@ def main(cfg):
         dataloaders,
         ckpt_path=checkpoints[0],
     )
-    print(len(model.errors))
     print("Maximum % error = {:.5f}%".format(np.max(model.errors)))
     print("Mean % error = {:.5f}%\n".format(np.mean(model.errors)))
+
+    Utils.plot_fit(
+        y=model.plot_y,
+        y_hat=model.plot_y_hat,
+        dpath=Path(__file__).parent.joinpath("fit_best.png"),
+    )
 
     trainer.test(
         model,
         dataloaders,
         ckpt_path=checkpoints[1],
     )
-    print(len(model.errors))
     print("Maximum % error = {:.5f}%".format(np.max(model.errors)))
     print("Mean % error = {:.5f}%\n".format(np.mean(model.errors)))
+
+    Utils.plot_fit(
+        y=model.plot_y,
+        y_hat=model.plot_y_hat,
+        dpath=Path(__file__).parent.joinpath("fit_last.png"),
+    )
 
 
 if __name__ == "__main__":

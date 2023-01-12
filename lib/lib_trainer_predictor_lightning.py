@@ -23,12 +23,14 @@ class MyRegressor(pl.LightningModule):
 
         self.learning_rate = cfg.train.base_lr if config is None else config["lr"]
         self.step_size_lr = cfg.train.step_size_lr
-        self.errors = []
         self.normalize = cfg.normalize
         self.step_size = cfg.train.step_size_lr
         self.resolution = cfg.resolution
         self.atom_types = cfg.atom_types
         self.count = 0
+        self.errors = []
+        self.plot_y = []
+        self.plot_y_hat = []
 
         if self.normalize == "z_score":
             mean_std = np.loadtxt(cfg.mean_std)
@@ -92,7 +94,10 @@ class MyRegressor(pl.LightningModule):
 
         error = torch.abs(tot - target) / torch.abs(target) * 100.0
 
-        return torch.mean(100.0 - error) if not test_step else error
+        if test_step:
+            return error, tot
+        else:
+            return torch.mean(100.0 - error)
 
     def training_step(self, train_batch, batch_idx=None, optimizer_idx=None):
         x, n_atoms, y = train_batch
@@ -127,9 +132,11 @@ class MyRegressor(pl.LightningModule):
     def test_step(self, test_batch, batch_idx=None):
         x, n_atoms, y = test_batch
         y_hat = self(x)
-        error = self.accuracy(y_hat, y, n_atoms, test_step=True)
+        error, predictions = self.accuracy(y_hat, y, n_atoms, test_step=True)
 
         self.errors = [*self.errors, *error.tolist()]
+        self.plot_y = [*self.plot_y, *torch.abs(y).tolist()]
+        self.plot_y_hat = [*self.plot_y_hat, *predictions.tolist()]
 
     def validation_epoch_end(self, outputs):
         loss = sum(output for output in outputs) / len(outputs)
@@ -140,6 +147,11 @@ class MyRegressor(pl.LightningModule):
             )
             self.min_val_loss = loss
             self.count = 0
+
+    def on_test_start(self):
+        self.errors.clear()
+        self.plot_y.clear()
+        self.plot_y_hat.clear()
 
 
 class MyDataloader(pl.LightningDataModule):

@@ -51,12 +51,12 @@ def main(cfg):
         trainer.fit(model, dataloaders)
 
     def tune_model_asha(
-        num_samples=20,
-        num_epochs=15,
+        num_samples=30,
+        num_epochs=20,
         gpus_per_trial=1,
     ):
         config = {
-            "lr": tune.loguniform(1e-4, 1e-3),
+            "lr": tune.loguniform(1e-4, 1e-2),
             # "batch_size": tune.choice([16, 32]),
         }
 

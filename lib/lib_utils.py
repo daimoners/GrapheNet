@@ -609,6 +609,21 @@ class Utils:
 
                         f.writelines(lines)
 
+    @staticmethod
+    def plot_fit(y: list, y_hat: list, dpath: Path):
+        min = np.min([np.min(y), np.min(y_hat)])
+        max = np.max([np.max(y), np.max(y_hat)])
+
+        plt.plot(
+            [min, max],
+            [min, max],
+        )
+        plt.scatter(y_hat, y, color="red")
+        plt.xlabel("Predictions")
+        plt.ylabel("Targets")
+        plt.title("Fit Curve")
+        plt.savefig(str(dpath))
+
 
 if __name__ == "__main__":
     # Utils.create_subset_xyz(
