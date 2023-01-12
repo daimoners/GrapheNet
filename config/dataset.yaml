@@ -1,6 +1,6 @@
 package_path: "/home/cnrismn/git_workspace/GrapheNet"
 spath: "${package_path}/data/subset_png"
-dpath: "${package_path}/data/training_dataset/" #"/home/cnrismn/git_workspace/Graphene/data/subset_training_dataset/"
+dpath: "${package_path}/data/training_dataset/"
 path_xyz: "${package_path}/data/subset_xyz/"
 path_csv: "${path_xyz}/dataset.csv"
 plot_distributions: True

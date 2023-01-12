@@ -32,8 +32,7 @@ def main(cfg):
         dataloaders = MyDataloader(
             cfg
         )  #! ho rimosso config perchè non mi serve il batch size
-        model = MyRegressor()
-        model.set_parameters(cfg, config)
+        model = MyRegressor(cfg, config)
         trainer = Trainer(
             deterministic=True,
             max_epochs=num_epochs,

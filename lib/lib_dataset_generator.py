@@ -64,6 +64,7 @@ class DatasetGenerator(object):
             )
             self.split_dataset()
             Utils.generate_num_atoms(dataset_path=self.dpath, xyz_path=self.path_xyz)
+            Utils.find_max_dimensions_png_folder(spath=self.spath, dpath=self.dpath)
         else:
             self.split_dataset_from_csv()
 

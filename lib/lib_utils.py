@@ -329,7 +329,7 @@ class Utils:
         print("Test files moved\n")
 
     @staticmethod
-    def find_max_dimensions_png_folder(spath: Path):
+    def find_max_dimensions_png_folder(spath: Path, dpath: Path = None):
         """Find the maximum dimensions in a folder of images"""
         heights = []
         widths = []
@@ -343,7 +343,13 @@ class Utils:
         heights = np.asarray(heights)
         widths = np.asarray(widths)
 
-        return np.max(widths), np.max(heights)
+        if dpath is None:
+            return np.max(widths), np.max(heights)
+        else:
+            np.savetxt(
+                dpath.joinpath("max_images_dimensions.txt"),
+                [np.max(widths), np.max(heights)],
+            )
 
     @staticmethod
     def padding_image(image, size=160):
@@ -605,8 +611,12 @@ class Utils:
 
 
 if __name__ == "__main__":
-    Utils.create_subset_xyz(
-        xyz_path=Path("/home/cnrismn/git_workspace/Graphene/data/dataset_xyz"),
-        dpath=Path(__file__).parent.parent.joinpath("data", "subset_xyz"),
-        n_items=7000,
+    # Utils.create_subset_xyz(
+    #     xyz_path=Path("/home/cnrismn/git_workspace/Graphene/data/dataset_xyz"),
+    #     dpath=Path(__file__).parent.parent.joinpath("data", "subset_xyz"),
+    #     n_items=7000,
+    # )
+    Utils.find_max_dimensions_png_folder(
+        spath=Path(__file__).parent.parent.joinpath("data", "subset_png"),
+        dpath=Path(__file__).parent.parent.joinpath("data", "training_dataset"),
     )

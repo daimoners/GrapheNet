@@ -18,32 +18,16 @@ except Exception as e:
 
 
 class MyRegressor(pl.LightningModule):
-    def __init__(
-        self,
-        resolution=160,
-        input_channels=1,
-        output_channels=2,
-    ):
+    def __init__(self, cfg, config=None):
         super(MyRegressor, self).__init__()
 
-        # self.net = MySimpleNet(resolution, input_channels, output_channels)
-        self.net = MySimpleResNet(resolution, input_channels, output_channels)
-        # self.net = DeepCNN(resolution, input_channels, output_channels)
-
-    def forward(self, x):
-
-        out = self.net(x)
-
-        return out
-
-    def set_parameters(self, cfg, config=None):
         self.learning_rate = cfg.train.base_lr if config is None else config["lr"]
         self.step_size_lr = cfg.train.step_size_lr
-        self.gamma_lr = cfg.train.gamma_lr
-        self.momentum = cfg.train.momentum
         self.errors = []
         self.normalize = cfg.normalize
         self.step_size = cfg.train.step_size_lr
+        self.resolution = cfg.resolution
+        self.atom_types = cfg.atom_types
         self.count = 0
 
         if self.normalize == "z_score":
@@ -54,6 +38,28 @@ class MyRegressor(pl.LightningModule):
             self.min, self.max = min_max[0], min_max[1]
 
         self.min_val_loss = float("inf")
+
+        # self.net = MySimpleNet(
+        #     resolution=self.resolution,
+        #     input_channels=self.atom_types,
+        #     output_channels=(self.atom_types + 1),
+        # )
+        self.net = MySimpleResNet(
+            resolution=self.resolution,
+            input_channels=self.atom_types,
+            output_channels=(self.atom_types + 1),
+        )
+        # self.net = DeepCNN(
+        #     resolution=self.resolution,
+        #     input_channels=self.atom_types,
+        #     output_channels=(self.atom_types + 1),
+        # )
+
+    def forward(self, x):
+
+        out = self.net(x)
+
+        return out
 
     def configure_optimizers(self):
         opt = torch.optim.Adam(
@@ -148,6 +154,8 @@ class MyDataloader(pl.LightningDataModule):
 
         self.resolution = cfg.resolution
         self.num_workers = cfg.num_workers
+        self.cluster = cfg.cluster
+        self.cluster_num_workers = cfg.cluster_num_workers
 
     def setup(self, stage=None):
         print(stage)
@@ -199,7 +207,9 @@ class MyDataloader(pl.LightningDataModule):
             self.train_data,
             batch_size=self.batch_size,
             shuffle=True,
-            num_workers=self.num_workers,
+            num_workers=self.num_workers
+            if not self.cluster
+            else self.cluster_num_workers,
             pin_memory=True,
             drop_last=True,
         )
@@ -209,7 +219,9 @@ class MyDataloader(pl.LightningDataModule):
             self.val_data,
             batch_size=self.batch_size,
             shuffle=False,
-            num_workers=self.num_workers,
+            num_workers=self.num_workers
+            if not self.cluster
+            else self.cluster_num_workers,
             pin_memory=True,
             drop_last=True,
         )
@@ -219,7 +231,9 @@ class MyDataloader(pl.LightningDataModule):
             self.test_data,
             batch_size=self.batch_size,
             shuffle=False,
-            num_workers=self.num_workers,
+            num_workers=self.num_workers
+            if not self.cluster
+            else self.cluster_num_workers,
             pin_memory=True,
             drop_last=True,
         )
@@ -544,6 +558,50 @@ class MyDatasetPng:
             torch.from_numpy(np.expand_dims(img.copy(), 0)).float(),
             torch.from_numpy(n_atoms).float(),
             torch.from_numpy(target).float(),
+        )
+
+
+class MyDatasetPngCluster:
+    """Class that generate a dataset for DataLoader module, given as input the paths of the .png files and the respective labels"""
+
+    def __init__(
+        self,
+        paths,
+        targets,
+        padding=True,
+        resolution=160,
+    ):
+        self.paths = paths
+        self.targets = targets
+        self.padding = padding
+        self.resolution = resolution
+
+        self.images = []
+        self.properties = []
+        self.n_atoms = []
+
+        for path, target in self.paths, self.targets:
+            img = cv2.imread(str(path), 0)
+            if self.padding:
+                img = Utils.padding_image(img, size=self.resolution)
+            img = np.asarray(img, float) / 255.0
+
+            target = np.array(float(target))
+
+            n_atoms = np.loadtxt(path.with_suffix(".txt"))
+
+            self.images.append(torch.from_numpy(np.expand_dims(img.copy(), 0)).float())
+            self.properties.append(torch.from_numpy(n_atoms).float())
+            self.n_atoms.append(torch.from_numpy(target).float())
+
+    def __len__(self):
+        return len(self.paths)
+
+    def __getitem__(self, i):
+        return (
+            self.images[i],
+            self.properties[i],
+            self.n_atoms[i],
         )
 
 

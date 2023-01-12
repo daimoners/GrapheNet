@@ -39,21 +39,16 @@ def main(cfg):
 
     seed_everything(42, workers=True)
 
-    model = MyRegressor()
-    model.set_parameters(cfg)
+    model = MyRegressor(cfg)
     checkpoint_callback = ModelCheckpoint(
-        dirpath=str(
-            Path(__file__).parent.joinpath("lightning_saves", "fixed_absolute_z")
-        ),
+        dirpath=str(Path(__file__).parent.joinpath("models")),
         save_top_k=1,
         monitor="val_loss",
         filename="best_loss_{val_loss:.5f}_{epoch}",
     )
 
     last_checkpoint_callback = ModelCheckpoint(
-        dirpath=str(
-            Path(__file__).parent.joinpath("lightning_saves", "fixed_absolute_z")
-        ),
+        dirpath=str(Path(__file__).parent.joinpath("models")),
         save_top_k=1,
         monitor="epoch",
         mode="max",
@@ -62,17 +57,32 @@ def main(cfg):
 
     dataloaders = MyDataloader(cfg)
 
-    trainer = Trainer(
-        deterministic=True,
-        accelerator="gpu",
-        devices=1,
-        max_epochs=cfg.train.num_epochs,
-        callbacks=[
-            checkpoint_callback,
-            last_checkpoint_callback,
-            get_progressbar(),
-        ],
-    )
+    if cfg.cluster:
+        trainer = Trainer(
+            deterministic=True,
+            accelerator="gpu",
+            num_nodes=1,
+            devices=2,
+            strategy="ddp",
+            max_epochs=cfg.train.num_epochs,
+            callbacks=[
+                checkpoint_callback,
+                last_checkpoint_callback,
+                get_progressbar(),
+            ],
+        )
+    else:
+        trainer = Trainer(
+            deterministic=True,
+            accelerator="gpu",
+            devices=1,
+            max_epochs=cfg.train.num_epochs,
+            callbacks=[
+                checkpoint_callback,
+                last_checkpoint_callback,
+                get_progressbar(),
+            ],
+        )
 
     start = time.time()
     trainer.fit(model, dataloaders)

@@ -33,12 +33,9 @@ def main(cfg):
 
     seed_everything(42, workers=True)
 
-    checkpoints = get_model_names(
-        Path(__file__).parent.joinpath("lightning_saves", "fixed_absolute_z")
-    )
+    checkpoints = get_model_names(Path(__file__).parent.joinpath("models"))
 
-    model = MyRegressor()
-    model.set_parameters(cfg)
+    model = MyRegressor(cfg)
 
     dataloaders = MyDataloader(cfg)
 

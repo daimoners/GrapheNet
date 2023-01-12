@@ -1,6 +1,8 @@
 .vscode/
 data/
-logs/
+lightning_logs/
 models/
 __pycache__/
 outputs/
+job.output
+job.error
