@@ -76,7 +76,7 @@ class MyRegressor(pl.LightningModule):
     def criterion(self, output, target, data):
         l2 = nn.MSELoss()
         tot = output[:, 0] + data[:] * output[:, 1]
-        target = torch.abs(target)
+
         if self.normalize == "z_score":
             target = (target - self.mean) / self.std
         if self.normalize == "normalization":
@@ -86,7 +86,7 @@ class MyRegressor(pl.LightningModule):
 
     def accuracy(self, output, target, data, test_step=False):
         tot = output[:, 0] + data[:] * output[:, 1]
-        target = torch.abs(target)
+
         if self.normalize == "z_score":
             tot = (tot * self.std) + self.mean
         if self.normalize == "normalization":
@@ -135,7 +135,7 @@ class MyRegressor(pl.LightningModule):
         error, predictions = self.accuracy(y_hat, y, n_atoms, test_step=True)
 
         self.errors = [*self.errors, *error.tolist()]
-        self.plot_y = [*self.plot_y, *torch.abs(y).tolist()]
+        self.plot_y = [*self.plot_y, *y.tolist()]
         self.plot_y_hat = [*self.plot_y_hat, *predictions.tolist()]
 
     def validation_epoch_end(self, outputs):
