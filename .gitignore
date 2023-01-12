@@ -7,5 +7,6 @@ outputs/
 job.output
 job.error
 job.log
-jobs/
 *.png
+test_*
+tests/

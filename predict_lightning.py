@@ -57,7 +57,7 @@ def main(cfg):
     Utils.plot_fit(
         y=model.plot_y,
         y_hat=model.plot_y_hat,
-        dpath=Path(__file__).parent.joinpath("fit_best.png"),
+        dpath=Path(cfg.train.spath).joinpath("fit_best.png"),
     )
 
     trainer.test(
@@ -71,7 +71,7 @@ def main(cfg):
     Utils.plot_fit(
         y=model.plot_y,
         y_hat=model.plot_y_hat,
-        dpath=Path(__file__).parent.joinpath("fit_last.png"),
+        dpath=Path(cfg.train.spath).joinpath("fit_last.png"),
     )
 
 

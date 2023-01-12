@@ -305,7 +305,7 @@ class MySimpleNet(nn.Module):
         x = self.relu(self.fc2(x))
         x = self.batchnorm5(x)
 
-        return self.relu(self.fc3(x))
+        return self.fc3(x)
 
     def find_dimenstion(self, resolution, input_channels):
 
@@ -405,7 +405,7 @@ class MySimpleResNet(nn.Module):
         x = self.fc2(x)
         x = self.relu(self.batchnorm5(x))
 
-        return self.relu(self.fc3(x))
+        return self.fc3(x)
 
     def find_dimenstion(self, resolution, input_channels):
 
