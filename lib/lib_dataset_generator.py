@@ -3,7 +3,6 @@ try:
     from tqdm import tqdm
     from lib.lib_utils import Utils
     import pandas as pd
-    import numpy as np
     import shutil
     from pathlib import Path
 
@@ -60,7 +59,11 @@ class DatasetGenerator(object):
         self.package_path = cfg.package_path
 
         if not self.csv_flag:
+            DatasetGenerator.generate_cropped_png_dataset_from_xyz(
+                spath=self.path_xyz, dpath=self.spath
+            )
             self.split_dataset()
+            Utils.generate_num_atoms(dataset_path=self.dpath, xyz_path=self.path_xyz)
         else:
             self.split_dataset_from_csv()
 

@@ -62,12 +62,6 @@ def main(cfg):
         }
 
         scheduler = ASHAScheduler(max_t=num_epochs, grace_period=1, reduction_factor=2)
-        # scheduler = PopulationBasedTraining(
-        #     perturbation_interval=4,
-        #     hyperparam_mutations={
-        #         "lr": tune.loguniform(1e-5, 1e-2),
-        #     },
-        # )
 
         reporter = CLIReporter(
             parameter_columns=["lr"],
@@ -91,7 +85,7 @@ def main(cfg):
             scheduler=scheduler,
             progress_reporter=reporter,
             name="tune_asha",
-            search_alg=OptunaSearch(),  #! sembra funzionare meglio con OptunaSearch()
+            search_alg=OptunaSearch(),
         )
 
         print("Best hyperparameters found were: ", analysis.best_config)

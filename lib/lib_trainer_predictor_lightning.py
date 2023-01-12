@@ -26,8 +26,8 @@ class MyRegressor(pl.LightningModule):
     ):
         super(MyRegressor, self).__init__()
 
-        self.net = MySimpleNet(resolution, input_channels, output_channels)
-        # self.net = MySimpleResNet(resolution, input_channels, output_channels)
+        # self.net = MySimpleNet(resolution, input_channels, output_channels)
+        self.net = MySimpleResNet(resolution, input_channels, output_channels)
         # self.net = DeepCNN(resolution, input_channels, output_channels)
 
     def forward(self, x):

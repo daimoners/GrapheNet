@@ -183,8 +183,8 @@ class Utils:
 
         if dpath is not None:
             np.savetxt(dpath.joinpath("max_min_coordinates.txt"), [MAX, MIN])
-
-        print([MAX, MIN])
+        else:
+            print([MAX, MIN])
 
         return MAX, MIN
 
@@ -512,14 +512,20 @@ class Utils:
 
         df = pd.read_csv(xyz_path.joinpath("dataset.csv"))
 
-        for file in random.sample(samples, k=n_items):
+        items = []
+
+        for file in tqdm(random.sample(samples, k=n_items)):
             shutil.copy(
                 file,
                 dpath.joinpath(file.name),
             )
-            df.drop(df[df["file_name"] == str(file.stem)].index, inplace=True)
+            items.append(file.stem)
+
+        df = df[df["file_name"].isin(items)]
 
         df.to_csv(dpath.joinpath("dataset.csv"))
+
+        Utils.dataset_max_and_min(spath=dpath, dpath=dpath)
 
         print("Done")
 
