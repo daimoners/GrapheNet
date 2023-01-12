@@ -1,0 +1,19 @@
+package_path: "/home/cnrismn/git_workspace/GrapheNet"
+spath: "${package_path}/new_data/dataset_png"
+dpath: "${package_path}/new_data/training_dataset/" #"/home/cnrismn/git_workspace/Graphene/data/subset_training_dataset/"
+path_xyz: "${package_path}/new_data/dataset_xyz/"
+path_csv: "${path_xyz}/dataset.csv"
+all: True
+plot_distributions: True
+features: ["total_energy"]
+energy_components: True
+
+randomly:
+  train_split: 0.7
+  val_split: 0.15
+  test_split: 0.15
+  shuffle: True
+
+from_csv:
+  flag: False
+  csv_dataset_path: ""

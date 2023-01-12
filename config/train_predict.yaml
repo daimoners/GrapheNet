@@ -1,0 +1,48 @@
+package_path: "/home/cnrismn/git_workspace/Graphene"
+network: { 1: "CNN", 2: "DeepCNN", 3: "Resnet18" }
+target: "total_energy"
+num_workers: 6
+net: 2
+resolution: 160
+energy_components: True
+notify: False
+save_lowest_loss: True
+normalize: None  #"normalization" | "z_score" | "log_scaling" | None
+min_max: "${train.spath}/min_max_${target}.txt"
+mean_std: "${train.spath}/mean_std_${target}.txt"
+negative_sign: False
+cell_parameters: True
+
+train:
+  spath: "${package_path}/new_data/training_dataset"
+  dpath: "${train.spath}/outputs/${target}"
+  base_lr: 0.0006477342954638862 #0.0001 #0.00046334041316667353 #0.0011204915114681377 #0.00023715431652232156 #0.001
+  num_epochs: 150
+  step_size_lr: 65
+  gamma_lr: 0.1
+  momentum: 0.9
+  batch_size: 32
+  val: True
+  patience: 5
+  cpu: False
+  name_model: "${target}"
+  early_stop: True
+  optimizer: "Adam" #"SGD or Adam"
+
+prediction:
+  fpath: "${train.spath}/test"
+  mpath: ""
+  dpath: "${train.dpath}"
+  csv: "${train.spath}/dataset.csv"
+  name_model: "${train.name_model}"
+  config: True
+  majors: 30
+  minors: 30
+  cpu: False
+  batch_size: 64
+  verbose: False
+
+logger:
+  flag: False
+  user: "tommaso-forni"
+  project: "graphene"
