@@ -1,6 +1,6 @@
 package_path: "/home/cnrismn/git_workspace/GrapheNet"
 target: "total_energy"
-resolution: 160
+resolution: 96
 normalize: None  #"normalization" | "z_score" | "log_scaling" | None
 cluster: False
 num_workers: 6
@@ -10,7 +10,7 @@ atom_types: 1
 
 train:
   spath: "${package_path}/data/training_dataset"
-  base_lr: 0.005999349210681328 #0.009004782855993668 #0.0009770215402745278 #trovato con hp_finder sul nuovo dataset da 7000 samples
+  base_lr: 0.00814013578020111 #0.009004782855993668 #0.0009770215402745278 #trovato con hp_finder sul nuovo dataset da 7000 samples
   num_epochs: 150
   step_size_lr: 65
   batch_size: 32

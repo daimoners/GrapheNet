@@ -22,39 +22,42 @@ class MyRegressor(pl.LightningModule):
         super(MyRegressor, self).__init__()
 
         self.learning_rate = cfg.train.base_lr if config is None else config["lr"]
-        self.step_size_lr = cfg.train.step_size_lr
         self.normalize = cfg.normalize
         self.step_size = cfg.train.step_size_lr
-        self.resolution = cfg.resolution
-        self.atom_types = cfg.atom_types
         self.count = 0
         self.errors = []
         self.plot_y = []
         self.plot_y_hat = []
 
         if self.normalize == "z_score":
-            mean_std = np.loadtxt(cfg.mean_std)
+            mean_std = np.loadtxt(
+                str(
+                    Path(cfg.train.spath).joinpath("train", "mean_std_total_energy.txt")
+                )
+            )
             self.mean, self.std = mean_std[0], mean_std[1]
         if self.normalize == "normalization":
-            min_max = np.loadtxt(cfg.min_max)
+            min_max = np.loadtxt(
+                str(Path(cfg.train.spath).joinpath("train", "min_max_total_energy.txt"))
+            )
             self.min, self.max = min_max[0], min_max[1]
 
         self.min_val_loss = float("inf")
 
         # self.net = MySimpleNet(
-        #     resolution=self.resolution,
-        #     input_channels=self.atom_types,
-        #     output_channels=(self.atom_types + 1),
+        #     resolution=cfg.resolution,
+        #     input_channels=cfg.atom_types,
+        #     output_channels=(cfg.atom_types + 1),
         # )
         self.net = MySimpleResNet(
-            resolution=self.resolution,
-            input_channels=self.atom_types,
-            output_channels=(self.atom_types + 1),
+            resolution=cfg.resolution,
+            input_channels=cfg.atom_types,
+            output_channels=(cfg.atom_types + 1),
         )
         # self.net = DeepCNN(
-        #     resolution=self.resolution,
-        #     input_channels=self.atom_types,
-        #     output_channels=(self.atom_types + 1),
+        #     resolution=cfg.resolution,
+        #     input_channels=cfg.atom_types,
+        #     output_channels=(cfg.atom_types + 1),
         # )
 
     def forward(self, x):
@@ -68,10 +71,16 @@ class MyRegressor(pl.LightningModule):
             self.parameters(),
             lr=self.learning_rate,
         )
-        # opt = torch.optim.AdamW(self.parameters(), lr=self.learning_rate)
-        scheduler = torch.optim.lr_scheduler.StepLR(opt, step_size=self.step_size)
 
-        return [opt], [scheduler]
+        return {
+            "optimizer": opt,
+            "lr_scheduler": {
+                "scheduler": torch.optim.lr_scheduler.ReduceLROnPlateau(
+                    opt, patience=25
+                ),
+                "monitor": "val_loss",
+            },
+        }
 
     def criterion(self, output, target, data):
         l2 = nn.MSELoss()
