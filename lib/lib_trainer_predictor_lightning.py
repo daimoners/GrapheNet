@@ -76,7 +76,9 @@ class MyRegressor(pl.LightningModule):
             "optimizer": opt,
             "lr_scheduler": {
                 "scheduler": torch.optim.lr_scheduler.ReduceLROnPlateau(
-                    opt, patience=25
+                    opt,
+                    patience=25,
+                    verbose=True,
                 ),
                 "monitor": "val_loss",
             },
@@ -207,21 +209,38 @@ class MyDataloader(pl.LightningDataModule):
                 Path(self.spath).joinpath("test", test_dataset["file_name"][i] + ".png")
             )
 
-        self.train_data = MyDatasetPng(
-            train_paths,
-            train_dataset[self.target],
-            resolution=self.resolution,
-        )
-        self.val_data = MyDatasetPng(
-            val_paths,
-            val_dataset[self.target],
-            resolution=self.resolution,
-        )
-        self.test_data = MyDatasetPng(
-            test_paths,
-            test_dataset[self.target],
-            resolution=self.resolution,
-        )
+        if self.cluster:
+            self.train_data = MyDatasetPngCluster(
+                train_paths,
+                train_dataset[self.target],
+                resolution=self.resolution,
+            )
+            self.val_data = MyDatasetPngCluster(
+                val_paths,
+                val_dataset[self.target],
+                resolution=self.resolution,
+            )
+            self.test_data = MyDatasetPngCluster(
+                test_paths,
+                test_dataset[self.target],
+                resolution=self.resolution,
+            )
+        else:
+            self.train_data = MyDatasetPng(
+                train_paths,
+                train_dataset[self.target],
+                resolution=self.resolution,
+            )
+            self.val_data = MyDatasetPng(
+                val_paths,
+                val_dataset[self.target],
+                resolution=self.resolution,
+            )
+            self.test_data = MyDatasetPng(
+                test_paths,
+                test_dataset[self.target],
+                resolution=self.resolution,
+            )
 
     def train_dataloader(self):
         return DataLoader(
@@ -556,11 +575,13 @@ class MyDatasetPng:
         targets,
         padding=True,
         resolution=160,
+        resize=False,
     ):
         self.paths = paths
         self.targets = targets
         self.padding = padding
         self.resolution = resolution
+        self.resize = resize
 
     def __len__(self):
         return len(self.paths)
@@ -569,6 +590,10 @@ class MyDatasetPng:
         img = cv2.imread(str(self.paths[i]), 0)
         if self.padding:
             img = Utils.padding_image(img, size=self.resolution)
+        elif self.resize:
+            img = cv2.resize(
+                img, (self.resolution, self.resolution), interpolation=cv2.INTER_CUBIC
+            )
         img = np.asarray(img, float) / 255.0
 
         target = np.array(float(self.targets[i]))
@@ -591,20 +616,28 @@ class MyDatasetPngCluster:
         targets,
         padding=True,
         resolution=160,
+        resize=False,
     ):
         self.paths = paths
         self.targets = targets
         self.padding = padding
         self.resolution = resolution
+        self.resize = resize
 
         self.images = []
         self.properties = []
         self.n_atoms = []
 
-        for path, target in self.paths, self.targets:
+        for path, target in zip(self.paths, self.targets):
             img = cv2.imread(str(path), 0)
             if self.padding:
                 img = Utils.padding_image(img, size=self.resolution)
+            elif self.resize:
+                img = cv2.resize(
+                    img,
+                    (self.resolution, self.resolution),
+                    interpolation=cv2.INTER_CUBIC,
+                )
             img = np.asarray(img, float) / 255.0
 
             target = np.array(float(target))

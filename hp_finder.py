@@ -56,7 +56,7 @@ def main(cfg):
         gpus_per_trial=1,
     ):
         config = {
-            "lr": tune.loguniform(1e-4, 1e-2),
+            "lr": tune.loguniform(1e-3, 1e-2),
             # "batch_size": tune.choice([16, 32]),
         }
 
