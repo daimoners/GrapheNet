@@ -6,6 +6,7 @@ cluster: False
 num_workers: 6
 cluster_num_workers: 16
 atom_types: 1
+sample: None
 
 
 train:
