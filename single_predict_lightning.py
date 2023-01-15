@@ -96,7 +96,7 @@ def plot_feature_maps(conv_layers, image, save_path: Path, num_filters: int = 10
     feature_maps_path = save_path.joinpath("feature_maps")
     feature_maps_path.mkdir(parents=True, exist_ok=True)
 
-    layers = {0: 64, 1: 128, 2: 128, 3: 256, 4: 256}
+    layers = {0: "64", 1: "128_1", 2: "128_2", 3: "256_1", 4: "256_2"}
     # visualize "num_filters" features from each layer
     # (although there are more feature maps in the upper layers)
     for num_layer in range(len(outputs)):

@@ -41,14 +41,14 @@ def main(cfg):
 
     model = MyRegressor(cfg)
     checkpoint_callback = ModelCheckpoint(
-        dirpath=str(Path(__file__).parent.joinpath("models")),
+        dirpath=str(Path(cfg.package_path).joinpath("models")),
         save_top_k=1,
         monitor="val_loss",
         filename="best_loss_{val_loss:.5f}_{epoch}",
     )
 
     last_checkpoint_callback = ModelCheckpoint(
-        dirpath=str(Path(__file__).parent.joinpath("models")),
+        dirpath=str(Path(cfg.package_path).joinpath("models")),
         save_top_k=1,
         monitor="epoch",
         mode="max",
@@ -67,7 +67,6 @@ def main(cfg):
             max_epochs=cfg.train.num_epochs,
             callbacks=[
                 checkpoint_callback,
-                last_checkpoint_callback,
                 get_progressbar(),
             ],
         )
@@ -79,7 +78,6 @@ def main(cfg):
             max_epochs=cfg.train.num_epochs,
             callbacks=[
                 checkpoint_callback,
-                last_checkpoint_callback,
                 get_progressbar(),
             ],
         )

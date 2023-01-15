@@ -11,7 +11,7 @@ sample: None
 
 train:
   spath: "${package_path}/data/training_dataset"
-  base_lr: 0.007185877396202472 #0.009004782855993668 #0.0009770215402745278 #trovato con hp_finder sul nuovo dataset da 7000 samples
+  base_lr: 0.007148138391360274 #0.008712970230331395 #0.009004782855993668 #0.0009770215402745278 #trovato con hp_finder sul nuovo dataset da 7000 samples
   num_epochs: 150
   step_size_lr: 65
   batch_size: 32

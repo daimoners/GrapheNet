@@ -20,13 +20,7 @@ def get_model_names(checkpoints_path: Path):
         if str(model.stem).startswith("best_loss")
     ]
 
-    last = [
-        model
-        for model in checkpoints_path.iterdir()
-        if str(model.stem).startswith("model_epoch")
-    ]
-
-    return str(best_loss[0]), str(last[0])
+    return str(best_loss[0])
 
 
 @hydra.main(version_base="1.2", config_path="config", config_name="train_predict")
@@ -34,7 +28,7 @@ def main(cfg):
 
     seed_everything(42, workers=True)
 
-    checkpoints = get_model_names(Path(__file__).parent.joinpath("models"))
+    checkpoints = get_model_names(Path(cfg.package_path).joinpath("models"))
 
     model = MyRegressor(cfg)
 
@@ -49,29 +43,16 @@ def main(cfg):
     trainer.test(
         model,
         dataloaders,
-        ckpt_path=checkpoints[0],
+        ckpt_path=checkpoints,
     )
     print("Maximum % error = {:.5f}%".format(np.max(model.errors)))
-    print("Mean % error = {:.5f}%\n".format(np.mean(model.errors)))
+    print("Mean % error = {:.5f}%".format(np.mean(model.errors)))
+    print("STD % error = {:.5f}%\n".format(np.std(model.errors)))
 
     Utils.plot_fit(
         y=model.plot_y,
         y_hat=model.plot_y_hat,
         dpath=Path(cfg.train.spath).joinpath("fit_best.png"),
-    )
-
-    trainer.test(
-        model,
-        dataloaders,
-        ckpt_path=checkpoints[1],
-    )
-    print("Maximum % error = {:.5f}%".format(np.max(model.errors)))
-    print("Mean % error = {:.5f}%\n".format(np.mean(model.errors)))
-
-    Utils.plot_fit(
-        y=model.plot_y,
-        y_hat=model.plot_y_hat,
-        dpath=Path(cfg.train.spath).joinpath("fit_last.png"),
     )
 
 

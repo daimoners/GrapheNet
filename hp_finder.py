@@ -27,7 +27,6 @@ def main(cfg):
     def train_tune(
         config,
         num_epochs=10,
-        num_gpus=0,
     ):
         dataloaders = MyDataloader(
             cfg
@@ -37,7 +36,8 @@ def main(cfg):
             deterministic=True,
             max_epochs=num_epochs,
             # If fractional GPUs passed in, convert to int.
-            gpus=math.ceil(num_gpus),
+            accelerator="gpu",
+            devices=1,
             logger=TensorBoardLogger(
                 save_dir=tune.get_trial_dir(), name="", version="."
             ),
@@ -51,18 +51,22 @@ def main(cfg):
         trainer.fit(model, dataloaders)
 
     def tune_model_asha(
-        num_samples=50,
-        num_epochs=25,
+        num_samples=25,
+        num_epochs=40,
         gpus_per_trial=1,
     ):
         config = {
-            "lr": tune.uniform(
-                0.001, 0.009
-            ),  # prima faccio "lr": tune.loguniform(1e-4, 1e-2) per capire il range e poi "lr": tune.uniform(0.001, 0.009) per trovare il valore esatto
+            "lr": tune.loguniform(
+                0.007, 0.009
+            ),  # dopo aver trovato un certo range con "lr": tune.loguniform(1e-4, 1e-2) e analizzando i risultati su tensorboard, uso "lr": tune.loguniform(0.007, 0.009) sul range trovato con il range (1e-4, 1e-2)
             # "batch_size": tune.choice([16, 32]),
         }
 
-        scheduler = ASHAScheduler(max_t=num_epochs, grace_period=1, reduction_factor=2)
+        scheduler = ASHAScheduler(
+            max_t=num_epochs,
+            grace_period=10,
+            reduction_factor=3,
+        )
 
         reporter = CLIReporter(
             parameter_columns=["lr"],
@@ -72,7 +76,6 @@ def main(cfg):
         train_fn_with_parameters = tune.with_parameters(
             train_tune,
             num_epochs=num_epochs,
-            num_gpus=gpus_per_trial,
         )
         resources_per_trial = {"cpu": 1, "gpu": gpus_per_trial}
 
