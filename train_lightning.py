@@ -3,9 +3,7 @@ try:
     from lib.lib_trainer_predictor_lightning import MyRegressor, MyDataloader
     import hydra
     from pytorch_lightning import Trainer
-    from pytorch_lightning.callbacks import (
-        ModelCheckpoint,
-    )
+    from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping
     from pathlib import Path
     import time
     from pytorch_lightning.callbacks import RichProgressBar
@@ -55,6 +53,10 @@ def main(cfg):
         filename="model_{epoch}",
     )
 
+    early_stopping = EarlyStopping(
+        monitor="val_loss", patience=50, verbose=True, check_on_train_epoch_end=False
+    )
+
     dataloaders = MyDataloader(cfg)
 
     if cfg.cluster:
@@ -68,6 +70,7 @@ def main(cfg):
             callbacks=[
                 checkpoint_callback,
                 get_progressbar(),
+                early_stopping,
             ],
         )
     else:
@@ -79,6 +82,7 @@ def main(cfg):
             callbacks=[
                 checkpoint_callback,
                 get_progressbar(),
+                early_stopping,
             ],
         )
 

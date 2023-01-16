@@ -102,13 +102,19 @@ class MyRegressor(pl.LightningModule):
                 )
             else:
                 raise Exception("Wrong number of atom types\n")
+        else:
+            output = torch.squeeze(output)
 
         if self.normalize == "z_score":
             target = (target - self.mean) / self.std
         if self.normalize == "normalization":
             target = (target - self.min) / (self.max - self.min)
 
-        return torch.sqrt(l2(output, target))
+        return (
+            torch.sqrt(l2(output, target))
+            if self.target == "total_energy"
+            else l2(output, target)
+        )
 
     def accuracy(self, output, target, data, test_step=False):
         if self.target == "total_energy":
@@ -123,6 +129,8 @@ class MyRegressor(pl.LightningModule):
                 )
             else:
                 raise Exception("Wrong number of atom types\n")
+        else:
+            output = torch.squeeze(output)
 
         if self.normalize == "z_score":
             output = (output * self.std) + self.mean

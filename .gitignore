@@ -11,3 +11,6 @@ job.log
 *.png
 test_*
 tests/
+*.error
+*.output
+*.log

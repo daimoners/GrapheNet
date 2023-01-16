@@ -14,6 +14,8 @@ try:
     import hydra
     from ray.tune.suggest.optuna import OptunaSearch
     from pytorch_lightning import Trainer, seed_everything
+    import yaml
+    from pathlib import Path
 
 except Exception as e:
 
@@ -32,27 +34,47 @@ def main(cfg):
             cfg
         )  #! ho rimosso config perchè non mi serve il batch size
         model = MyRegressor(cfg, config)
-        trainer = Trainer(
-            deterministic=True,
-            max_epochs=num_epochs,
-            # If fractional GPUs passed in, convert to int.
-            accelerator="gpu",
-            devices=1,
-            logger=TensorBoardLogger(
-                save_dir=tune.get_trial_dir(), name="", version="."
-            ),
-            callbacks=[
-                TuneReportCallback(
-                    {"loss": "val_loss", "mean_accuracy": "val_acc"},
-                    on="validation_end",
-                )
-            ],
-        )
+        if cfg.cluster:
+            trainer = Trainer(
+                deterministic=True,
+                max_epochs=num_epochs,
+                # If fractional GPUs passed in, convert to int.
+                accelerator="gpu",
+                num_nodes=1,
+                devices=2,
+                strategy="ddp",
+                logger=TensorBoardLogger(
+                    save_dir=tune.get_trial_dir(), name="", version="."
+                ),
+                callbacks=[
+                    TuneReportCallback(
+                        {"loss": "val_loss", "mean_accuracy": "val_acc"},
+                        on="validation_end",
+                    )
+                ],
+            )
+        else:
+            trainer = Trainer(
+                deterministic=True,
+                max_epochs=num_epochs,
+                # If fractional GPUs passed in, convert to int.
+                accelerator="gpu",
+                devices=1,
+                logger=TensorBoardLogger(
+                    save_dir=tune.get_trial_dir(), name="", version="."
+                ),
+                callbacks=[
+                    TuneReportCallback(
+                        {"loss": "val_loss", "mean_accuracy": "val_acc"},
+                        on="validation_end",
+                    )
+                ],
+            )
         trainer.fit(model, dataloaders)
 
     def tune_model_asha(
-        num_samples=25,
-        num_epochs=40,
+        num_samples=20,
+        num_epochs=15,
         gpus_per_trial=1,
     ):
         config = {
@@ -88,11 +110,15 @@ def main(cfg):
             num_samples=num_samples,
             scheduler=scheduler,
             progress_reporter=reporter,
-            name="tune_asha",
+            name=f"{cfg.target}_tune_asha",
             search_alg=OptunaSearch(),
         )
 
         print("Best hyperparameters found were: ", analysis.best_config)
+        with open(
+            str(Path(cfg.train.spath).joinpath(f"{cfg.target}_best_config.yaml")), "w"
+        ) as outfile:
+            yaml.dump(analysis.best_config, outfile)
 
     tune_model_asha()
 
