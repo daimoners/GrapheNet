@@ -24,6 +24,8 @@ class MyRegressor(pl.LightningModule):
         self.learning_rate = cfg.train.base_lr if config is None else config["lr"]
         self.normalize = cfg.normalize
         self.step_size = cfg.train.step_size_lr
+        self.target = cfg.target
+        self.atom_types = cfg.atom_types
         self.count = 0
         self.errors = []
         self.plot_y = []
@@ -46,18 +48,20 @@ class MyRegressor(pl.LightningModule):
 
         # self.net = MySimpleNet(
         #     resolution=cfg.resolution,
-        #     input_channels=cfg.atom_types,
-        #     output_channels=(cfg.atom_types + 1),
+        #     input_channels=self.atom_types,
+        #     output_channels=(self.atom_types + 1) if self.target == "total_energy" else 1
         # )
         self.net = MySimpleResNet(
             resolution=cfg.resolution,
-            input_channels=cfg.atom_types,
-            output_channels=(cfg.atom_types + 1),
+            input_channels=self.atom_types,
+            output_channels=(self.atom_types + 1)
+            if self.target == "total_energy"
+            else 1,
         )
         # self.net = DeepCNN(
         #     resolution=cfg.resolution,
-        #     input_channels=cfg.atom_types,
-        #     output_channels=(cfg.atom_types + 1),
+        #     input_channels=self.atom_types,
+        #     output_channels=(self.atom_types + 1) if self.target == "total_energy" else 1
         # )
 
     def forward(self, x):
@@ -77,7 +81,7 @@ class MyRegressor(pl.LightningModule):
             "lr_scheduler": {
                 "scheduler": torch.optim.lr_scheduler.ReduceLROnPlateau(
                     opt,
-                    patience=25,
+                    patience=20,
                     verbose=True,
                 ),
                 "monitor": "val_loss",
@@ -86,27 +90,49 @@ class MyRegressor(pl.LightningModule):
 
     def criterion(self, output, target, data):
         l2 = nn.MSELoss()
-        tot = output[:, 0] + data[:] * output[:, 1]
+        if self.target == "total_energy":
+            if self.atom_types == 1:
+                output = output[:, 0] + data[:] * output[:, 1]
+            elif self.atom_types == 3:
+                output = (
+                    output[:, 0]
+                    + data[:, 0] * output[:, 1]
+                    + data[:, 1] * output[:, 2]
+                    + data[:, 2] * output[:, 3]
+                )
+            else:
+                raise Exception("Wrong number of atom types\n")
 
         if self.normalize == "z_score":
             target = (target - self.mean) / self.std
         if self.normalize == "normalization":
             target = (target - self.min) / (self.max - self.min)
 
-        return torch.sqrt(l2(tot, target))
+        return torch.sqrt(l2(output, target))
 
     def accuracy(self, output, target, data, test_step=False):
-        tot = output[:, 0] + data[:] * output[:, 1]
+        if self.target == "total_energy":
+            if self.atom_types == 1:
+                output = output[:, 0] + data[:] * output[:, 1]
+            elif self.atom_types == 3:
+                output = (
+                    output[:, 0]
+                    + data[:, 0] * output[:, 1]
+                    + data[:, 1] * output[:, 2]
+                    + data[:, 2] * output[:, 3]
+                )
+            else:
+                raise Exception("Wrong number of atom types\n")
 
         if self.normalize == "z_score":
-            tot = (tot * self.std) + self.mean
+            output = (output * self.std) + self.mean
         if self.normalize == "normalization":
-            tot = tot * (self.max - self.min) + self.min
+            output = output * (self.max - self.min) + self.min
 
-        error = torch.abs(tot - target) / torch.abs(target) * 100.0
+        error = torch.abs(output - target) / torch.abs(target) * 100.0
 
         if test_step:
-            return error, tot
+            return error, output
         else:
             return torch.mean(100.0 - error)
 
@@ -179,6 +205,7 @@ class MyDataloader(pl.LightningDataModule):
         self.num_workers = cfg.num_workers
         self.cluster = cfg.cluster
         self.cluster_num_workers = cfg.cluster_num_workers
+        self.enlargement_method = cfg.enlargement_method
 
     def setup(self, stage=None):
         print(stage)
@@ -214,32 +241,38 @@ class MyDataloader(pl.LightningDataModule):
                 train_paths,
                 train_dataset[self.target],
                 resolution=self.resolution,
+                enlargement_method=self.enlargement_method,
             )
             self.val_data = MyDatasetPngCluster(
                 val_paths,
                 val_dataset[self.target],
                 resolution=self.resolution,
+                enlargement_method=self.enlargement_method,
             )
             self.test_data = MyDatasetPngCluster(
                 test_paths,
                 test_dataset[self.target],
                 resolution=self.resolution,
+                enlargement_method=self.enlargement_method,
             )
         else:
             self.train_data = MyDatasetPng(
                 train_paths,
                 train_dataset[self.target],
                 resolution=self.resolution,
+                enlargement_method=self.enlargement_method,
             )
             self.val_data = MyDatasetPng(
                 val_paths,
                 val_dataset[self.target],
                 resolution=self.resolution,
+                enlargement_method=self.enlargement_method,
             )
             self.test_data = MyDatasetPng(
                 test_paths,
                 test_dataset[self.target],
                 resolution=self.resolution,
+                enlargement_method=self.enlargement_method,
             )
 
     def train_dataloader(self):
@@ -573,24 +606,22 @@ class MyDatasetPng:
         self,
         paths,
         targets,
-        padding=True,
         resolution=160,
-        resize=False,
+        enlargement_method="padding",
     ):
         self.paths = paths
         self.targets = targets
-        self.padding = padding
         self.resolution = resolution
-        self.resize = resize
+        self.enlargement_method = enlargement_method
 
     def __len__(self):
         return len(self.paths)
 
     def __getitem__(self, i):
-        img = cv2.imread(str(self.paths[i]), 0)
-        if self.padding:
+        img = cv2.imread(str(self.paths[i]), -1)
+        if self.enlargement_method == "padding":
             img = Utils.padding_image(img, size=self.resolution)
-        elif self.resize:
+        elif self.enlargement_method == "resize":
             img = cv2.resize(
                 img, (self.resolution, self.resolution), interpolation=cv2.INTER_CUBIC
             )
@@ -600,11 +631,24 @@ class MyDatasetPng:
 
         n_atoms = np.loadtxt((self.paths[i]).with_suffix(".txt"))
 
-        return (
-            torch.from_numpy(np.expand_dims(img.copy(), 0)).float(),
-            torch.from_numpy(n_atoms).float(),
-            torch.from_numpy(target).float(),
-        )
+        if len(img.shape) == 2:
+            return (
+                torch.from_numpy(np.expand_dims(img.copy(), 0)).float(),
+                torch.from_numpy(n_atoms).float(),
+                torch.from_numpy(target).float(),
+            )
+        elif len(img.shape) == 3 and img.shape[2] == 3:
+            return (
+                torch.squeeze(
+                    torch.from_numpy(np.expand_dims(img.copy(), 0))
+                    .permute(0, 3, 1, 2)
+                    .float()
+                ),
+                torch.from_numpy(n_atoms).float(),
+                torch.from_numpy(target).float(),
+            )
+        else:
+            raise Exception("Wrong dimensions for the input images\n")
 
 
 class MyDatasetPngCluster:
@@ -614,25 +658,23 @@ class MyDatasetPngCluster:
         self,
         paths,
         targets,
-        padding=True,
         resolution=160,
-        resize=False,
+        enlargement_method="padding",
     ):
         self.paths = paths
         self.targets = targets
-        self.padding = padding
         self.resolution = resolution
-        self.resize = resize
+        self.enlargement_method = enlargement_method
 
         self.images = []
         self.properties = []
         self.n_atoms = []
 
         for path, target in zip(self.paths, self.targets):
-            img = cv2.imread(str(path), 0)
-            if self.padding:
+            img = cv2.imread(str(path), -1)
+            if self.enlargement_method == "padding":
                 img = Utils.padding_image(img, size=self.resolution)
-            elif self.resize:
+            elif self.enlargement_method == "resize":
                 img = cv2.resize(
                     img,
                     (self.resolution, self.resolution),
@@ -644,9 +686,24 @@ class MyDatasetPngCluster:
 
             n_atoms = np.loadtxt(path.with_suffix(".txt"))
 
-            self.images.append(torch.from_numpy(np.expand_dims(img.copy(), 0)).float())
-            self.properties.append(torch.from_numpy(n_atoms).float())
-            self.n_atoms.append(torch.from_numpy(target).float())
+            if len(img.shape) == 2:
+                self.images.append(
+                    torch.from_numpy(np.expand_dims(img.copy(), 0)).float()
+                )
+                self.properties.append(torch.from_numpy(n_atoms).float())
+                self.n_atoms.append(torch.from_numpy(target).float())
+            elif len(img.shape) == 3 and img.shape[2] == 3:
+                self.images.append(
+                    torch.squeeze(
+                        torch.from_numpy(np.expand_dims(img.copy(), 0))
+                        .permute(0, 3, 1, 2)
+                        .float()
+                    )
+                )
+                self.properties.append(torch.from_numpy(n_atoms).float())
+                self.n_atoms.append(torch.from_numpy(target).float())
+            else:
+                raise Exception("Wrong dimensions for the input images\n")
 
     def __len__(self):
         return len(self.paths)

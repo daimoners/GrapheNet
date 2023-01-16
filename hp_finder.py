@@ -57,7 +57,7 @@ def main(cfg):
     ):
         config = {
             "lr": tune.loguniform(
-                0.007, 0.009
+                1e-4, 1e-1
             ),  # dopo aver trovato un certo range con "lr": tune.loguniform(1e-4, 1e-2) e analizzando i risultati su tensorboard, uso "lr": tune.loguniform(0.007, 0.009) sul range trovato con il range (1e-4, 1e-2)
             # "batch_size": tune.choice([16, 32]),
         }

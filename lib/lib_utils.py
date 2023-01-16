@@ -620,6 +620,7 @@ class Utils:
         min = np.min([np.min(y), np.min(y_hat)])
         max = np.max([np.max(y), np.max(y_hat)])
 
+        plt.figure(figsize=(10, 7))
         plt.plot(
             [min, max],
             [min, max],

@@ -54,7 +54,7 @@ def main(cfg):
     Utils.plot_fit(
         y=model.plot_y,
         y_hat=model.plot_y_hat,
-        dpath=Path(cfg.train.spath).joinpath("fit_best.png"),
+        dpath=Path(cfg.train.spath).joinpath("models", f"{cfg.target}", "best_fit.png"),
     )
 
 
