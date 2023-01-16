@@ -318,13 +318,13 @@ class Utils:
             dpath.joinpath("dataset.csv"),
         )
 
-        try:
-            shutil.copy(
-                csv.parent.joinpath("max_min_coordinates.txt"),
-                dpath.joinpath("max_min_coordinates.txt"),
-            )
-        except:
-            pass
+        # try:
+        #     shutil.copy(
+        #         csv.parent.joinpath("max_min_coordinates.txt"), #! non mi serve questa parte
+        #         dpath.joinpath("max_min_coordinates.txt"),
+        #     )
+        # except:
+        #     pass
 
         print("Test files moved\n")
 
@@ -510,7 +510,11 @@ class Utils:
         return dt_string
 
     @staticmethod
-    def create_subset_xyz(xyz_path: Path, dpath: Path, n_items: int):
+    def create_subset_xyz(
+        xyz_path: Path, dpath: Path, n_items: int, targets=["total_energy"]
+    ):
+
+        targets = ["file_name", *targets]
 
         dpath.mkdir(parents=True, exist_ok=True)
 
@@ -528,6 +532,8 @@ class Utils:
             items.append(file.stem)
 
         df = df[df["file_name"].isin(items)]
+
+        df = df[targets]
 
         df.to_csv(dpath.joinpath("dataset.csv"))
 
@@ -624,14 +630,63 @@ class Utils:
         plt.title("Fit Curve")
         plt.savefig(str(dpath))
 
+    @staticmethod
+    def drop_outliers(
+        spath: Path,
+        dpath: Path,
+        targets: list = [
+            "total_energy",
+            "ionization_potential",
+            "electronegativity",
+            "electron_affinity",
+            "band_gap",
+            "Fermi_energy",
+        ],
+    ):
+
+        dpath.mkdir(parents=True, exist_ok=True)
+
+        dataframe = pd.read_csv(str(spath.joinpath("dataset.csv")))
+
+        print("Dropping outliers from the dataset...\n")
+
+        indices = []
+
+        for t in targets:
+            idx = dataframe.index[dataframe[t] == 0.0].tolist()
+            indices = [*indices, *idx]
+
+        dataframe = dataframe.drop(indices, axis=0)
+
+        files = dataframe["file_name"].tolist()
+
+        for f in files:
+            shutil.copy(
+                str(spath.joinpath(f"{f}.xyz")), str(dpath.joinpath(f"{f}.xyz"))
+            )
+
+        dataframe.to_csv(dpath.joinpath("dataset.csv"))
+
 
 if __name__ == "__main__":
+    # Utils.drop_outliers(
+    #     spath=Path("/home/cnrismn/git_workspace/Chemception/data/xyz_files_opt"),
+    #     dpath=Path(__file__).parent.parent.joinpath("data_GO", "filtered_xyz"),
+    # )
     # Utils.create_subset_xyz(
-    #     xyz_path=Path("/home/cnrismn/git_workspace/Graphene/data/dataset_xyz"),
-    #     dpath=Path(__file__).parent.parent.joinpath("data", "subset_xyz"),
+    #     xyz_path=Path(__file__).parent.parent.joinpath("data_GO", "filtered_xyz"),
+    #     dpath=Path(__file__).parent.parent.joinpath("data_GO", "subset_xyz"),
     #     n_items=7000,
+    #     targets=[
+    #         "total_energy",
+    #         "ionization_potential",
+    #         "electronegativity",
+    #         "electron_affinity",
+    #         "band_gap",
+    #         "Fermi_energy",
+    #     ],
     # )
     Utils.find_max_dimensions_png_folder(
-        spath=Path(__file__).parent.parent.joinpath("data", "subset_png"),
-        dpath=Path(__file__).parent.parent.joinpath("data", "training_dataset"),
+        spath=Path(__file__).parent.parent.joinpath("data_GO", "subset_png"),
+        dpath=Path(__file__).parent.parent.joinpath("data_GO", "training_dataset"),
     )

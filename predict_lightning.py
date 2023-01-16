@@ -28,7 +28,9 @@ def main(cfg):
 
     seed_everything(42, workers=True)
 
-    checkpoints = get_model_names(Path(cfg.package_path).joinpath("models"))
+    checkpoints = get_model_names(
+        Path(cfg.train.spath).joinpath("models", f"{cfg.target}")
+    )
 
     model = MyRegressor(cfg)
 

@@ -1,10 +1,11 @@
 package_path: "/home/cnrismn/git_workspace/GrapheNet"
-spath: "${package_path}/data/subset_png"
-dpath: "${package_path}/data/training_dataset/"
-path_xyz: "${package_path}/data/subset_xyz/"
+data_path: "${package_path}/data_GO"
+path_xyz: "${data_path}/subset_xyz/"
 path_csv: "${path_xyz}/dataset.csv"
+spath: "${data_path}/subset_png"
+dpath: "${data_path}/training_dataset/"
 plot_distributions: True
-features: ["total_energy"]
+features: ["total_energy", "ionization_potential", "electronegativity", "electron_affinity", "band_gap", "Fermi_energy"]
 
 randomly:
   train_split: 0.7

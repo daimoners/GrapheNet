@@ -171,10 +171,12 @@ def load_model(cfg, checkpoints_path: Path):
 def main(cfg):
 
     seed_everything(42, workers=True)
-    save_path = Path(cfg.package_path).joinpath("single_prediction")
+    save_path = Path(cfg.train.spath).joinpath("visualization")
     save_path.mkdir(exist_ok=True, parents=True)
 
-    model = load_model(cfg, checkpoints_path=Path(cfg.package_path).joinpath("models"))
+    model = load_model(
+        cfg, checkpoints_path=Path(cfg.train.spath).joinpath("models", f"{cfg.target}")
+    )
 
     model_weights, conv_layers = get_weights_and_layers(model)
 

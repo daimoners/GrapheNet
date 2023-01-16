@@ -1,5 +1,6 @@
 .vscode/
-data/
+data_G/
+data_GO/
 lightning_logs/
 models/
 __pycache__/
