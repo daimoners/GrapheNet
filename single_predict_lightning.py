@@ -10,6 +10,7 @@ try:
     import torch
     import cv2
     import matplotlib.pyplot as plt
+    import shutil
 
 except Exception as e:
 
@@ -122,9 +123,18 @@ def load_image(img_path: Path, resolution: int):
     image = cv2.imread(str(img_path), -1)
     image = Utils.padding_image(image, size=resolution)
     image = np.asarray(image, float) / 255.0
-    image = torch.unsqueeze(
-        torch.from_numpy(np.expand_dims(image.copy(), 0)).float(), 0
-    )
+    if len(image.shape) == 2:
+        image = torch.unsqueeze(
+            torch.from_numpy(np.expand_dims(image.copy(), 0)).float(), 0
+        )
+    elif len(image.shape) == 3 and image.shape[2] == 3:
+        image = (
+            torch.from_numpy(np.expand_dims(image.copy(), 0))
+            .permute(0, 3, 1, 2)
+            .float()
+        )
+    else:
+        raise Exception("Wrong dimensions for the input images\n")
     image = image.to(torch.device("cuda"))
 
     return image
@@ -136,7 +146,15 @@ def make_prediction(model, image, sample_path: Path, target: str = "total_energy
 
     if target == "total_energy":
         n_atoms = np.loadtxt(str(sample_path.with_suffix(".txt")))
-        prediction = prediction[0] + n_atoms * prediction[1]
+        if prediction.size == 2:
+            prediction = prediction[0] + n_atoms * prediction[1]
+        elif prediction.size == 4:
+            prediction = (
+                prediction[0]
+                + n_atoms[0] * prediction[1]
+                + n_atoms[1] * prediction[2]
+                + n_atoms[2] * prediction[3]
+            )
 
     return prediction
 
@@ -171,7 +189,9 @@ def load_model(cfg, checkpoints_path: Path):
 def main(cfg):
 
     seed_everything(42, workers=True)
-    save_path = Path(cfg.train.spath).joinpath("visualization")
+    save_path = Path(cfg.train.spath).joinpath(
+        "models", f"{cfg.target}", "visualization"
+    )
     save_path.mkdir(exist_ok=True, parents=True)
 
     model = load_model(
@@ -185,6 +205,7 @@ def main(cfg):
     prediction = make_prediction(model, image, Path(cfg.sample))
     print(f"Predicted target: {prediction:.4f}")
 
+    shutil.copy(cfg.sample, str(save_path))
     plot_filters(model_weights, save_path)
     plot_feature_maps(conv_layers, image, save_path)
 
