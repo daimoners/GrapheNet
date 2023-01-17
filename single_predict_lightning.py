@@ -106,7 +106,7 @@ def plot_feature_maps(conv_layers, image, save_path: Path, num_filters: int = 10
         for i, filter in enumerate(layer_viz):
             if i == num_filters:  # we will visualize only 8x8 blocks from each layer
                 break
-            plt.imshow(filter.detach().cpu(), cmap="inferno")
+            plt.imshow(filter.detach().cpu(), cmap="plasma")
             plt.savefig(
                 str(
                     feature_maps_path.joinpath(

@@ -54,7 +54,7 @@ def main(cfg):
     )
 
     early_stopping = EarlyStopping(
-        monitor="val_loss", patience=50, verbose=True, check_on_train_epoch_end=False
+        monitor="val_loss", patience=35, verbose=True, check_on_train_epoch_end=False
     )
 
     dataloaders = MyDataloader(cfg)

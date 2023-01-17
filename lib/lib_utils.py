@@ -616,7 +616,7 @@ class Utils:
                         f.writelines(lines)
 
     @staticmethod
-    def plot_fit(y: list, y_hat: list, dpath: Path):
+    def plot_fit(y: list, y_hat: list, dpath: Path, target: str):
         min = np.min([np.min(y), np.min(y_hat)])
         max = np.max([np.max(y), np.max(y_hat)])
 
@@ -628,7 +628,7 @@ class Utils:
         plt.scatter(y_hat, y, color="red")
         plt.xlabel("Predictions")
         plt.ylabel("Targets")
-        plt.title("Fit Curve")
+        plt.title(f"{target}")
         plt.savefig(str(dpath))
 
     @staticmethod

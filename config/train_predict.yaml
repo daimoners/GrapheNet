@@ -1,5 +1,5 @@
 package_path: "/home/cnrismn/git_workspace/GrapheNet"
-target: "ionization_potential"
+target: "total_energy"
 resolution: 160
 enlargement_method: "padding" #"padding" | "resize"
 normalize: None  #"normalization" | "z_score" | "log_scaling" | None
@@ -12,7 +12,7 @@ sample: None
 
 train:
   spath: "${package_path}/data_GO/training_dataset"
-  base_lr: 0.03141166628369398 #0.007148138391360274 sul nuovo dataset da 7000 samples
+  base_lr: 0.015193886879304386 #0.007148138391360274 sul nuovo dataset da 7000 samples
   num_epochs: 150
   step_size_lr: 65
   batch_size: 32
