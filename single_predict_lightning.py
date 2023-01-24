@@ -33,6 +33,8 @@ def plot_filters(model_weights, save_path: Path):
     filters_path = save_path.joinpath("filters")
     filters_path.mkdir(parents=True, exist_ok=True)
 
+    print("Plotting filters...")
+
     plt.figure(figsize=(15, 15))
     for i, filter in enumerate(model_weights[0]):
         plt.subplot(
@@ -85,6 +87,8 @@ def plot_filters(model_weights, save_path: Path):
 
 
 def plot_feature_maps(conv_layers, image, save_path: Path, num_filters: int = 10):
+
+    print("Plotting feature maps...")
 
     # pass the image through all the layers
     results = [conv_layers[0](image)]
@@ -190,7 +194,7 @@ def main(cfg):
 
     seed_everything(42, workers=True)
     save_path = Path(cfg.train.spath).joinpath(
-        "models", f"{cfg.target}", "visualization"
+        "models", f"{cfg.target}", f"visualization_{Path(cfg.sample).stem}"
     )
     save_path.mkdir(exist_ok=True, parents=True)
 

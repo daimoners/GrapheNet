@@ -6,6 +6,7 @@ try:
     from pathlib import Path
     import numpy as np
     from lib.lib_utils import Utils
+    import yaml
 
 except Exception as e:
 
@@ -50,6 +51,22 @@ def main(cfg):
     print("Maximum % error = {:.5f}%".format(np.max(model.errors)))
     print("Mean % error = {:.5f}%".format(np.mean(model.errors)))
     print("STD % error = {:.5f}%\n".format(np.std(model.errors)))
+
+    performance = {
+        "Maximum % error": float(np.max(model.errors)),
+        "Mean % error": float(np.mean(model.errors)),
+        "STD % error": float(np.std(model.errors)),
+    }
+
+    with open(
+        str(
+            Path(cfg.train.spath).joinpath(
+                "models", f"{cfg.target}", f"{cfg.target}_best_results.yaml"
+            )
+        ),
+        "w",
+    ) as outfile:
+        yaml.dump(performance, outfile)
 
     Utils.plot_fit(
         y=model.plot_y,

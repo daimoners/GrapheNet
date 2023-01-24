@@ -23,7 +23,6 @@ class MyRegressor(pl.LightningModule):
 
         self.learning_rate = cfg.train.base_lr if config is None else config["lr"]
         self.normalize = cfg.normalize
-        self.step_size = cfg.train.step_size_lr
         self.target = cfg.target
         self.atom_types = cfg.atom_types
         self.count = 0

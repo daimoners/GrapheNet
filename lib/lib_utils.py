@@ -661,7 +661,65 @@ class Utils:
 
         files = dataframe["file_name"].tolist()
 
-        for f in files:
+        for f in tqdm(files):
+            shutil.copy(
+                str(spath.joinpath(f"{f}.xyz")), str(dpath.joinpath(f"{f}.xyz"))
+            )
+
+        dataframe.to_csv(dpath.joinpath("dataset.csv"))
+
+    @staticmethod
+    def drop_custom(
+        spath: Path,
+        dpath: Path,
+        targets: list = [
+            "total_energy",
+            "ionization_potential",
+            "electronegativity",
+            "electron_affinity",
+            "band_gap",
+            "Fermi_energy",
+        ],
+    ):
+        dpath.mkdir(parents=True, exist_ok=True)
+
+        dataframe = pd.read_csv(str(spath.joinpath("dataset.csv")))
+
+        print("Dropping outliers from the dataset...\n")
+
+        indices = []
+
+        for t in targets:
+            idx = dataframe.index[dataframe[t] == 0.0].tolist()
+            indices = [*indices, *idx]
+
+        el_aff_down = dataframe.index[dataframe["electron_affinity"] <= -6.8].tolist()
+        el_aff_up = dataframe.index[dataframe["electron_affinity"] >= -4.8].tolist()
+        el_aff = [*el_aff_down, *el_aff_up]
+
+        elneg_down = dataframe.index[dataframe["electronegativity"] <= -6.1].tolist()
+        elneg_up = dataframe.index[dataframe["electronegativity"] >= -4.5].tolist()
+        elneg = [*elneg_down, *elneg_up]
+
+        i_pot_down = dataframe.index[dataframe["ionization_potential"] <= -5.5].tolist()
+        i_pot_up = dataframe.index[dataframe["ionization_potential"] >= -3.7].tolist()
+        i_pot = [*i_pot_down, *i_pot_up]
+
+        energy_down = dataframe.index[dataframe["total_energy"] <= -80000].tolist()
+        energy_up = dataframe.index[dataframe["total_energy"] >= 0].tolist()
+        energy = [*energy_down, *energy_up]
+
+        band_gap_down = dataframe.index[dataframe["band_gap"] <= 0.8].tolist()
+        band_gap_up = dataframe.index[dataframe["band_gap"] >= 2.4].tolist()
+        band_gap = [*band_gap_down, *band_gap_up]
+
+        indices = [*indices, *el_aff, *elneg, *i_pot, *energy, *band_gap]
+
+        dataframe = dataframe.drop(indices, axis=0)
+
+        files = dataframe["file_name"].tolist()
+
+        for f in tqdm(files):
             shutil.copy(
                 str(spath.joinpath(f"{f}.xyz")), str(dpath.joinpath(f"{f}.xyz"))
             )
@@ -691,3 +749,7 @@ if __name__ == "__main__":
         spath=Path(__file__).parent.parent.joinpath("data_GO", "subset_png"),
         dpath=Path(__file__).parent.parent.joinpath("data_GO", "training_dataset"),
     )
+    # Utils.drop_custom(
+    #     spath=Path("/home/cnrismn/git_workspace/Chemception/data/xyz_files_opt"),
+    #     dpath=Path(__file__).parent.parent.joinpath("data_GO", "custom_xyz"),
+    # )
