@@ -1,9 +1,9 @@
 package_path: "/home/cnrismn/git_workspace/GrapheNet"
 data_path: "${package_path}/data_GO"
-path_xyz: "${data_path}/subset_xyz/"
+path_xyz: "${data_path}/custom_subset_xyz/"
 path_csv: "${path_xyz}/dataset.csv"
-spath: "${data_path}/subset_png"
-dpath: "${data_path}/training_dataset/"
+spath: "${data_path}/custom_subset_png"
+dpath: "${data_path}/custom_training_dataset/"
 plot_distributions: True
 features: ["total_energy", "ionization_potential", "electronegativity", "electron_affinity", "band_gap", "Fermi_energy"]
 

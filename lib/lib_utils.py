@@ -14,6 +14,10 @@ try:
     from torch.utils.data import DataLoader
     from pathlib import Path
     import matplotlib.pyplot as plt
+    import cupy as cp
+    import math
+    from scipy.stats import pearsonr, spearmanr, kendalltau
+    import yaml
 
 except Exception as e:
 
@@ -727,6 +731,318 @@ class Utils:
         dataframe.to_csv(dpath.joinpath("dataset.csv"))
 
 
+class CoulombUtils:
+    @staticmethod
+    def compute_coulomb_matrix(xyz_file: Path, dpath: Path) -> cp.array:
+        """
+        Compute the Coulomb matrix of a molecule from the 3D coordinates of its atoms as proposed by Rupp et al. in
+        "Fast and Accurate Modeling of Molecular Atomization Energies with Machine Learning" (2012).
+
+        Parameters:
+        xyz_file (Path): The path to the xyz file containing the atomic coordinates.
+        dpath (Path): The output path for the txt file.
+
+        Returns:
+        cp.array : The Coulomb matrix of the molecule
+
+        """
+        # Read the xyz file and extract the atomic coordinates
+        with open(str(xyz_file), "r") as f:
+            lines = f.readlines()
+            num_atoms = int(lines[0])
+            coordinates = []
+            periodic_table = {
+                "H": 1,
+                "C": 6,
+                "O": 8,
+            }
+            for line in lines[2:]:
+                tokens = line.split()
+                atom_type = tokens[0]
+                nuclear_charge = periodic_table[atom_type]
+                x, y, z = map(float, tokens[1:4])
+                coordinates.append([nuclear_charge, x, y, z])
+
+        # Compute the Coulomb matrix
+        coordinates = cp.array(coordinates)
+        coulomb_matrix = cp.zeros((num_atoms, num_atoms))
+        for i in range(num_atoms):
+            for j in range(i, num_atoms):
+                if i == j:
+                    coulomb_matrix[i, j] = 0.5 * coordinates[i, 0] ** 2.4
+                else:
+                    distance = cp.linalg.norm(coordinates[i, 1:] - coordinates[j, 1:])
+                    coulomb_matrix[i, j] = (
+                        coordinates[i, 0] * coordinates[j, 0] / distance
+                    )
+                    coulomb_matrix[j, i] = coulomb_matrix[i, j]
+        eigenvalues = cp.sort(cp.linalg.eigvalsh(coulomb_matrix))[::-1]
+        coulomb_matrix_sorted = eigenvalues - eigenvalues[:, None]
+
+        upper_triangular = cp.triu(coulomb_matrix_sorted)
+
+        # Convert the cupy array to numpy array
+        upper_triangular_np = cp.asnumpy(upper_triangular)
+
+        # Save the upper triangular matrix to a file
+        np.savetxt(
+            dpath.joinpath(xyz_file.stem + ".txt"),
+            upper_triangular_np,
+            delimiter=",",
+        )
+
+        return coulomb_matrix_sorted
+
+    @staticmethod
+    def fast_compute_coulomb_matrix(xyz_file: Path, dpath: Path) -> cp.array:
+        """
+        Compute the Coulomb matrix of a molecule from the 3D coordinates of its atoms, permute the Coulomb matrix in such a way that the rows (and columns) Ci of the Coulomb matrix are ordered by their norm.
+
+        Parameters:
+        xyz_file (Path): The path to the xyz file containing the atomic coordinates.
+        dpath (Path): The output path for the txt file.
+
+        Returns:
+        np.ndarray : The Coulomb matrix of the molecule
+
+        """
+        # Read the xyz file and extract the atomic coordinates
+        with open(str(xyz_file), "r") as f:
+            lines = f.readlines()
+            num_atoms = int(lines[0])
+            coordinates = []
+            periodic_table = {
+                "H": 1,
+                "C": 6,
+                "O": 8,
+            }
+            for line in lines[2:]:
+                tokens = line.split()
+                atom_type = tokens[0]
+                nuclear_charge = periodic_table[atom_type]
+                x, y, z = map(float, tokens[1:4])
+                coordinates.append([nuclear_charge, x, y, z])
+
+        # Compute the Coulomb matrix
+        coordinates = cp.array(coordinates)
+        coulomb_matrix = cp.zeros((num_atoms, num_atoms))
+        for i in range(num_atoms):
+            for j in range(i, num_atoms):
+                if i == j:
+                    coulomb_matrix[i, j] = 0.5 * coordinates[i, 0] ** 2.4
+                else:
+                    distance = cp.linalg.norm(coordinates[i, 1:] - coordinates[j, 1:])
+                    coulomb_matrix[i, j] = (
+                        coordinates[i, 0] * coordinates[j, 0] / distance
+                    )
+                    coulomb_matrix[j, i] = coulomb_matrix[i, j]
+        norm = cp.linalg.norm(coulomb_matrix, axis=1)
+        sort_indices = cp.argsort(norm)[::-1]
+        sorted_matrix = coulomb_matrix[sort_indices]
+        sorted_matrix = sorted_matrix[:, sort_indices]
+
+        upper_triangular = cp.triu(sorted_matrix)
+
+        # Convert the cupy array to numpy array
+        upper_triangular_np = cp.asnumpy(upper_triangular)
+
+        # Save the upper triangular matrix to a file
+        np.savetxt(
+            dpath.joinpath(xyz_file.stem + ".txt"),
+            upper_triangular_np,
+            delimiter=",",
+        )
+
+        return sorted_matrix
+
+    @staticmethod
+    def generate_coulomb_matrices(spath: Path, dpath: Path, fast: False):
+
+        dpath.mkdir(parents=True, exist_ok=True)
+
+        items = [f for f in spath.iterdir() if f.suffix == ".xyz"]
+        pbar = tqdm(total=len(items))
+
+        for i in items:
+            CoulombUtils.fast_compute_coulomb_matrix(
+                i, dpath
+            ) if fast else CoulombUtils.compute_coulomb_matrix(i, dpath)
+            pbar.update(1)
+        pbar.close()
+
+        print("Done")
+
+    @staticmethod
+    def restore_symmetric_matrix(matrix: np.array):
+
+        # Reconstruct the symmetric matrix
+        symmetric_matrix = matrix - cp.transpose(matrix)
+
+        return symmetric_matrix
+
+
+class OxygenUtils:
+    @staticmethod
+    def get_oxygen_distribution_means(
+        csv_path: Path, xyz_path: Path, dpath: Path = None
+    ) -> np.array:
+
+        MAX, MIN = OxygenUtils.find_max_min_distribution(csv_path, xyz_path)
+
+        df = pd.read_csv(str(csv_path))
+        names = df["file_name"].tolist()
+
+        distribution_means = []
+        distribution = []
+        d = []
+
+        for f in tqdm(range(len(names))):
+
+            X, Y, Z, atoms = Utils.read_from_xyz_file(
+                xyz_path.joinpath(names[f] + ".xyz")
+            )
+
+            distribution.clear()
+
+            for i in range(len(X)):
+                if atoms[i] == "O":
+                    d.clear()
+                    for j in range(len(X)):
+                        if atoms[j] == "O" and i != j:
+                            P1 = [X[i], Y[i], Z[i]]
+                            P2 = [X[j], Y[j], Z[j]]
+                            d.append(math.dist(P1, P2))
+
+                    distribution.append((np.mean(d) - MIN) / (MAX - MIN))
+
+            distribution_means.append(np.mean(distribution))
+
+            if dpath is not None:
+                plt.hist(distribution, bins=8)
+
+                # Add labels and title
+                plt.xlabel("Data")
+                plt.ylabel("Frequency")
+                plt.title("Histogram of Data")
+
+                # Show the plot
+                plt.savefig(dpath.joinpath("distributions", names[f] + ".png"))
+                plt.close()
+
+                hist_data = np.histogram(distribution, bins=8)
+                np.savetxt(
+                    str(
+                        dpath.joinpath("distributions", f"{names[f]}_distribution.txt")
+                    ),
+                    hist_data[0],
+                )
+
+        if dpath is not None:
+            np.savetxt(
+                str(dpath.joinpath("distribution_means.txt")),
+                np.array(distribution_means),
+            )
+
+        return distribution_means
+
+    @staticmethod
+    def find_max_min_distribution(csv_path: Path, xyz_path: Path):
+        print("Finding MAX and MIN value of the oxygen distribution...\n")
+        df = pd.read_csv(str(csv_path))
+        names = df["file_name"].tolist()
+
+        max_distribution = []
+        min_distribution = []
+
+        distribution = []
+        d = []
+
+        for f in range(len(names)):
+
+            X, Y, Z, atoms = Utils.read_from_xyz_file(
+                xyz_path.joinpath(names[f] + ".xyz")
+            )
+
+            distribution.clear()
+
+            for i in range(len(X)):
+                if atoms[i] == "O":
+                    d.clear()
+                    for j in range(len(X)):
+                        if atoms[j] == "O" and i != j:
+                            P1 = [X[i], Y[i], Z[i]]
+                            P2 = [X[j], Y[j], Z[j]]
+                            d.append(math.dist(P1, P2))
+
+                    distribution.append(np.mean(d))
+
+            max_distribution.append(np.max(distribution))
+            min_distribution.append(np.min(distribution))
+
+        return np.max(max_distribution), np.min(min_distribution)
+
+    @staticmethod
+    def compute_correlation(
+        csv_path: Path, distribution_path: Path, dpath: Path, normalize: bool = False
+    ):
+        dpath.mkdir(parents=True, exist_ok=True)
+        # Load data
+        df = pd.read_csv(str(csv_path))
+        distribution = np.loadtxt(str(distribution_path))
+
+        if normalize:
+            var = np.array(df["total_energy"])
+            max = np.max(var)
+            min = np.min(var)
+            var = (var - min) / (max - min)
+            df["total_energy"] = var
+
+            max_distribution = np.max(distribution)
+            min_distribution = np.min(distribution)
+            distribution = (distribution - min_distribution) / (
+                max_distribution - min_distribution
+            )
+
+        # Calculate Pearson correlation coefficient
+        pearson_corr, p_value = pearsonr(df["total_energy"], distribution)
+        print("Pearson correlation coefficient:", pearson_corr)
+
+        # Calculate Spearman rank correlation coefficient
+        spear_corr, p_value = spearmanr(df["total_energy"], distribution)
+        print("Spearman rank correlation coefficient:", spear_corr)
+
+        # Calculate Kendall rank correlation coefficient
+        kendall_corr, p_value = kendalltau(df["total_energy"], distribution)
+        print("Kendall rank correlation coefficient:", kendall_corr)
+
+        correlation = {
+            "Pearson correlation coefficient": float(pearson_corr),
+            "Spearman rank correlation coefficient": float(spear_corr),
+            "Kendall rank correlation coefficient": float(kendall_corr),
+        }
+        with open(
+            str(dpath.joinpath("correlation.yaml")),
+            "w",
+        ) as outfile:
+            yaml.dump(correlation, outfile)
+
+        # Scatter plot
+        plt.scatter(df["total_energy"], distribution)
+        plt.xlabel("total_energy")
+        plt.ylabel("distribution")
+        plt.title("Scatter plot")
+        plt.savefig(str(dpath.joinpath("scatter.png")))
+        plt.close()
+
+        # Line plot
+        plt.plot(df["total_energy"], distribution)
+        plt.xlabel("total_energy")
+        plt.ylabel("distribution")
+        plt.title("Line plot")
+        plt.savefig(str(dpath.joinpath("line.png")))
+        plt.close()
+
+
 if __name__ == "__main__":
     # Utils.drop_outliers(
     #     spath=Path("/home/cnrismn/git_workspace/Chemception/data/xyz_files_opt"),
@@ -745,11 +1061,32 @@ if __name__ == "__main__":
     #         "Fermi_energy",
     #     ],
     # )
-    Utils.find_max_dimensions_png_folder(
-        spath=Path(__file__).parent.parent.joinpath("data_GO", "subset_png"),
-        dpath=Path(__file__).parent.parent.joinpath("data_GO", "training_dataset"),
-    )
+    # Utils.find_max_dimensions_png_folder(
+    #     spath=Path(__file__).parent.parent.joinpath("data_GO", "subset_png"),
+    #     dpath=Path(__file__).parent.parent.joinpath("data_GO", "training_dataset"),
+    # )
     # Utils.drop_custom(
     #     spath=Path("/home/cnrismn/git_workspace/Chemception/data/xyz_files_opt"),
     #     dpath=Path(__file__).parent.parent.joinpath("data_GO", "custom_xyz"),
     # )
+    # CoulombUtils.generate_coulomb_matrices(
+    #     spath=Path(__file__).parent.parent.joinpath("data_GO", "custom_subset_xyz"),
+    #     dpath=Path(__file__).parent.parent.joinpath("data_GO", "custom_coulomb"),
+    #     fast=True,
+    # )
+    # OxygenUtils.get_oxygen_distribution_means(
+    #     csv_path=Path(
+    #         "/home/cnrismn/git_workspace/Chemception/data/xyz_files_opt/dataset.csv"
+    #     ),
+    #     xyz_path=Path("/home/cnrismn/git_workspace/Chemception/data/xyz_files_opt"),
+    #     dpath=Path(__file__).parent.parent.joinpath("tests", "oxygens"),
+    # )
+    OxygenUtils.compute_correlation(
+        csv_path=Path(
+            "/home/cnrismn/git_workspace/Chemception/data/xyz_files_opt/dataset.csv"
+        ),
+        distribution_path=Path(__file__).parent.parent.joinpath(
+            "tests", "oxygens", "distribution_means.txt"
+        ),
+        dpath=Path(__file__).parent.parent.joinpath("tests", "oxygens", "results"),
+    )
