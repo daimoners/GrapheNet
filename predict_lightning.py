@@ -29,9 +29,7 @@ def main(cfg):
 
     seed_everything(42, workers=True)
 
-    checkpoints = get_model_names(
-        Path(cfg.train.spath).joinpath("models", f"{cfg.target}")
-    )
+    checkpoints = get_model_names(Path(cfg.train.dpath))
 
     model = MyRegressor(cfg)
 
@@ -60,8 +58,8 @@ def main(cfg):
 
     with open(
         str(
-            Path(cfg.train.spath).joinpath(
-                "models", f"{cfg.target}", f"{cfg.target}_best_results.yaml"
+            Path(cfg.train.dpath).joinpath(
+                f"{cfg.target}_best_results.yaml",
             )
         ),
         "w",
@@ -71,9 +69,7 @@ def main(cfg):
     Utils.plot_fit(
         y=model.plot_y,
         y_hat=model.plot_y_hat,
-        dpath=Path(cfg.train.spath).joinpath(
-            "models", f"{cfg.target}", f"{cfg.target}_best_fit.png"
-        ),
+        dpath=Path(cfg.train.dpath).joinpath(f"{cfg.target}_best_fit.png"),
         target=cfg.target,
     )
 

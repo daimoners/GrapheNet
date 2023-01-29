@@ -909,8 +909,8 @@ class OxygenUtils:
                     d.clear()
                     for j in range(len(X)):
                         if atoms[j] == "O" and i != j:
-                            P1 = [X[i], Y[i], Z[i]]
-                            P2 = [X[j], Y[j], Z[j]]
+                            P1 = [X[i], Y[i]]
+                            P2 = [X[j], Y[j]]
                             d.append(math.dist(P1, P2))
 
                     distribution.append((np.mean(d) - MIN) / (MAX - MIN))
@@ -918,7 +918,10 @@ class OxygenUtils:
             distribution_means.append(np.mean(distribution))
 
             if dpath is not None:
-                plt.hist(distribution, bins=8)
+                plt.hist(
+                    distribution,
+                    bins=[0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9],
+                )
 
                 # Add labels and title
                 plt.xlabel("Data")
@@ -929,12 +932,17 @@ class OxygenUtils:
                 plt.savefig(dpath.joinpath("distributions", names[f] + ".png"))
                 plt.close()
 
-                hist_data = np.histogram(distribution, bins=8)
+                hist_data = np.histogram(
+                    distribution,
+                    bins=[0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9],
+                )
                 np.savetxt(
                     str(
                         dpath.joinpath("distributions", f"{names[f]}_distribution.txt")
                     ),
-                    hist_data[0],
+                    hist_data[
+                        0
+                    ],  # TODO va normalizzata prima di salvarla, capire che normalizzazione devo fare
                 )
 
         if dpath is not None:
@@ -970,8 +978,8 @@ class OxygenUtils:
                     d.clear()
                     for j in range(len(X)):
                         if atoms[j] == "O" and i != j:
-                            P1 = [X[i], Y[i], Z[i]]
-                            P2 = [X[j], Y[j], Z[j]]
+                            P1 = [X[i], Y[i]]
+                            P2 = [X[j], Y[j]]
                             d.append(math.dist(P1, P2))
 
                     distribution.append(np.mean(d))
@@ -983,64 +991,127 @@ class OxygenUtils:
 
     @staticmethod
     def compute_correlation(
-        csv_path: Path, distribution_path: Path, dpath: Path, normalize: bool = False
+        csv_path: Path, distribution_path: Path, dpath: Path, normalize: bool = True
     ):
         dpath.mkdir(parents=True, exist_ok=True)
         # Load data
         df = pd.read_csv(str(csv_path))
         distribution = np.loadtxt(str(distribution_path))
 
+        # df = df.dropna(
+        #     subset=[
+        #         "electronegativity",
+        #         "total_energy",
+        #         "electron_affinity",
+        #         "ionization_potential",
+        #         "Fermi_energy",
+        #     ]
+        # )
+        df["electronegativity"].fillna(0, inplace=True)
+        print(len(df))
+
         if normalize:
             var = np.array(df["total_energy"])
             max = np.max(var)
             min = np.min(var)
-            var = (var - min) / (max - min)
+            var = (var - min) / (max - min) + 0.0001
+            print(var)
             df["total_energy"] = var
+
+            var = np.array(df["electronegativity"])
+            max = np.max(var)
+            min = np.min(var)
+            var = (var - min) / (max - min) + 0.0001
+            print(var)
+            df["electronegativity"] = var
 
             max_distribution = np.max(distribution)
             min_distribution = np.min(distribution)
             distribution = (distribution - min_distribution) / (
                 max_distribution - min_distribution
-            )
+            ) + 0.0001
 
-        # Calculate Pearson correlation coefficient
-        pearson_corr, p_value = pearsonr(df["total_energy"], distribution)
-        print("Pearson correlation coefficient:", pearson_corr)
+        # # Calculate Pearson correlation coefficient
+        # pearson_corr, p_value = pearsonr(df["total_energy"], distribution)
+        # print("Pearson correlation coefficient:", pearson_corr)
 
-        # Calculate Spearman rank correlation coefficient
-        spear_corr, p_value = spearmanr(df["total_energy"], distribution)
-        print("Spearman rank correlation coefficient:", spear_corr)
+        # # Calculate Spearman rank correlation coefficient
+        # spear_corr, p_value = spearmanr(df["total_energy"], distribution)
+        # print("Spearman rank correlation coefficient:", spear_corr)
 
-        # Calculate Kendall rank correlation coefficient
-        kendall_corr, p_value = kendalltau(df["total_energy"], distribution)
-        print("Kendall rank correlation coefficient:", kendall_corr)
+        # # Calculate Kendall rank correlation coefficient
+        # kendall_corr, p_value = kendalltau(df["total_energy"], distribution)
+        # print("Kendall rank correlation coefficient:", kendall_corr)
 
-        correlation = {
-            "Pearson correlation coefficient": float(pearson_corr),
-            "Spearman rank correlation coefficient": float(spear_corr),
-            "Kendall rank correlation coefficient": float(kendall_corr),
-        }
-        with open(
-            str(dpath.joinpath("correlation.yaml")),
-            "w",
-        ) as outfile:
-            yaml.dump(correlation, outfile)
+        # correlation = {
+        #     "Pearson correlation coefficient": float(pearson_corr),
+        #     "Spearman rank correlation coefficient": float(spear_corr),
+        #     "Kendall rank correlation coefficient": float(kendall_corr),
+        # }
+        # with open(
+        #     str(dpath.joinpath("correlation.yaml")),
+        #     "w",
+        # ) as outfile:
+        #     yaml.dump(correlation, outfile)
 
         # Scatter plot
-        plt.scatter(df["total_energy"], distribution)
-        plt.xlabel("total_energy")
+        plt.scatter(np.exp(df["electronegativity"]), np.exp(distribution))
+        plt.xlabel("electronegativity")
         plt.ylabel("distribution")
         plt.title("Scatter plot")
-        plt.savefig(str(dpath.joinpath("scatter.png")))
+        plt.savefig(str(dpath.joinpath("scatter_exp.png")))
         plt.close()
 
         # Line plot
-        plt.plot(df["total_energy"], distribution)
-        plt.xlabel("total_energy")
+        plt.plot(np.exp(df["electronegativity"]), np.exp(distribution))
+        plt.xlabel("electronegativity")
         plt.ylabel("distribution")
         plt.title("Line plot")
-        plt.savefig(str(dpath.joinpath("line.png")))
+        plt.savefig(str(dpath.joinpath("line_exp.png")))
         plt.close()
+
+        # plt.hist(
+        #     distribution,
+        #     bins=[0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0],
+        # )
+
+        # # Add labels and title
+        # plt.xlabel("Mean Distribution")
+        # plt.ylabel("Frequency")
+        # plt.title("Histogram of Data")
+
+        # # Show the plot
+        # plt.savefig(str(dpath.joinpath("distribution_means.png")))
+        # plt.close()
+
+    @staticmethod
+    def copy_distributions(dataset_path: Path, distribution_path: Path):
+
+        train_path = dataset_path.joinpath("train")
+        val_path = dataset_path.joinpath("val")
+        test_path = dataset_path.joinpath("test")
+
+        train_items = [item for item in train_path.iterdir() if item.suffix == ".png"]
+        val_items = [item for item in val_path.iterdir() if item.suffix == ".png"]
+        test_items = [item for item in test_path.iterdir() if item.suffix == ".png"]
+
+        for item in tqdm(train_items):
+            shutil.copy(
+                str(distribution_path.joinpath(item.stem + "_distribution.txt")),
+                str(train_path.joinpath(item.stem + "_distribution.txt")),
+            )
+
+        for item in tqdm(val_items):
+            shutil.copy(
+                str(distribution_path.joinpath(item.stem + "_distribution.txt")),
+                str(val_path.joinpath(item.stem + "_distribution.txt")),
+            )
+
+        for item in tqdm(test_items):
+            shutil.copy(
+                str(distribution_path.joinpath(item.stem + "_distribution.txt")),
+                str(test_path.joinpath(item.stem + "_distribution.txt")),
+            )
 
 
 if __name__ == "__main__":
@@ -1090,3 +1161,11 @@ if __name__ == "__main__":
         ),
         dpath=Path(__file__).parent.parent.joinpath("tests", "oxygens", "results"),
     )
+    # OxygenUtils.copy_distributions(
+    #     dataset_path=Path(__file__).parent.parent.joinpath(
+    #         "data_GO", "custom_training_dataset"
+    #     ),
+    #     distribution_path=Path(__file__).parent.parent.joinpath(
+    #         "tests", "oxygens", "distributions"
+    #     ),
+    # )

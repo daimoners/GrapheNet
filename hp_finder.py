@@ -12,7 +12,7 @@ try:
     from pytorch_lightning import Trainer
     import math
     import hydra
-    from ray.tune.suggest.optuna import OptunaSearch
+    from ray.tune.search.optuna import OptunaSearch
     from pytorch_lightning import Trainer, seed_everything
     import yaml
     from pathlib import Path
@@ -20,6 +20,34 @@ try:
 except Exception as e:
 
     print("Some module are missing {}".format(e))
+
+
+def update_yaml(new_value, target_key="base_lr"):
+    def search_and_modify(data, target_key, new_value):
+        for key, value in data.items():
+            if key == target_key:
+                data[key] = new_value
+                return True
+            elif type(value) is dict:
+                if search_and_modify(value, target_key, new_value):
+                    return True
+        return False
+
+    # Open the YAML file
+    with open(
+        str(Path().resolve().joinpath("config", "train_predict.yaml")), "r"
+    ) as file:
+        # Load the YAML data into a Python dictionary
+        data = yaml.load(file, Loader=yaml.FullLoader)
+
+    if search_and_modify(data, target_key, new_value):
+        with open(
+            str(Path().resolve().joinpath("config", "train_predict.yaml")), "w"
+        ) as file:
+            yaml.dump(data, file)
+        print(f"{target_key} value changed to {new_value}")
+    else:
+        print(f"{target_key} not found in the file")
 
 
 @hydra.main(version_base="1.2", config_path="config", config_name="train_predict")
@@ -119,6 +147,7 @@ def main(cfg):
             str(Path(cfg.train.spath).joinpath(f"{cfg.target}_best_config.yaml")), "w"
         ) as outfile:
             yaml.dump(analysis.best_config, outfile)
+        update_yaml(new_value=analysis.best_config["lr"])
 
     tune_model_asha()
 

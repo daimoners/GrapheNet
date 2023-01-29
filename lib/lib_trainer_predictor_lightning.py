@@ -497,6 +497,110 @@ class MySimpleResNet(nn.Module):
         return x.size()[1]
 
 
+class MySimpleResNetWithDistribution(nn.Module):
+    def __init__(self, resolution=160, input_channels=1, output_channels=2):
+        super(MySimpleResNetWithDistribution, self).__init__()
+
+        self.conv128 = nn.Conv2d(
+            in_channels=input_channels, out_channels=64, kernel_size=3
+        )
+        self.batchnorm1 = nn.BatchNorm2d(self.conv128.out_channels)
+        self.max_pool = nn.MaxPool2d(2, 2)
+        self.conv256_1 = nn.Conv2d(
+            in_channels=self.conv128.out_channels,
+            out_channels=128,
+            kernel_size=3,
+            padding=1,
+        )
+        self.conv256_2 = nn.Conv2d(
+            in_channels=self.conv256_1.out_channels,
+            out_channels=128,
+            kernel_size=3,
+            padding=1,
+        )
+        self.batchnorm2 = nn.BatchNorm2d(self.conv256_2.out_channels)
+        self.conv512_1 = nn.Conv2d(
+            in_channels=self.conv256_2.out_channels,
+            out_channels=256,
+            kernel_size=3,
+            padding=1,
+        )
+        self.conv512_2 = nn.Conv2d(
+            in_channels=self.conv512_1.out_channels,
+            out_channels=256,
+            kernel_size=3,
+            padding=1,
+        )
+        self.batchnorm3 = nn.BatchNorm2d(self.conv512_2.out_channels)
+
+        self.flatten = nn.Flatten()
+        self.relu = nn.ReLU()
+
+        self.downsample_1 = nn.Sequential(
+            nn.Conv2d(64, 128, kernel_size=1, bias=False),
+            nn.BatchNorm2d(128),
+        )
+
+        self.downsample_2 = nn.Sequential(
+            nn.Conv2d(128, 256, kernel_size=1, bias=False),
+            nn.BatchNorm2d(256),
+        )
+
+        self.fc1 = nn.Linear(self.find_dimenstion(resolution, input_channels), 512)
+        self.batchnorm4 = nn.BatchNorm1d(self.fc1.out_features)
+        self.dropout = nn.Dropout(0.5)
+        self.fc2 = nn.Linear(self.fc1.out_features, 256)
+        self.batchnorm5 = nn.BatchNorm1d(self.fc2.out_features)
+        self.fc3 = nn.Linear(self.fc2.out_features, output_channels)
+
+    def forward(self, input1, input2):
+
+        x = self.conv128(input1)
+        x = self.relu(self.batchnorm1(x))
+        x = self.max_pool(x)
+        residual = x
+        x = self.conv256_1(x)
+        x = self.conv256_2(x)
+        x = self.relu(self.batchnorm2(x)) + self.downsample_1(residual)
+        x = self.max_pool(x)
+        residual = x
+        x = self.conv512_1(x)
+        x = self.conv512_2(x)
+        x = self.relu(self.batchnorm3(x)) + self.downsample_2(residual)
+        x = self.max_pool(x)
+        x = self.flatten(x)
+        x = self.fc1(
+            torch.cat((x, input2), dim=1)
+        )  # TODO forse va concatenato quando la dimensione della prima parte è 3/4 volte la dimensione della distribuzione (24/32 se la dimensione della distribuzione è 8)
+        x = self.relu(self.batchnorm4(x))
+        x = self.dropout(x)
+        x = self.fc2(x)
+        x = self.relu(self.batchnorm5(x))
+
+        return self.fc3(x)
+
+    def find_dimenstion(self, resolution, input_channels):
+
+        x = torch.rand(1, input_channels, resolution, resolution)
+
+        x = self.conv128(x)
+        x = self.relu(self.batchnorm1(x))
+        x = self.max_pool(x)
+        residual = x
+        x = self.conv256_1(x)
+        x = self.conv256_2(x)
+        x = self.relu(self.batchnorm2(x)) + self.downsample_1(residual)
+        x = self.max_pool(x)
+        residual = x
+        x = self.conv512_1(x)
+        x = self.conv512_2(x)
+        x = self.relu(self.batchnorm3(x)) + self.downsample_2(residual)
+        x = self.max_pool(x)
+        x = self.flatten(x)
+
+        return x.size()[1] + 8
+
+
 class DeepCNN(nn.Module):
     #  Determine what layers and their order in CNN object
     def __init__(
@@ -721,6 +825,66 @@ class MyDatasetPngCluster:
             self.properties[i],
             self.n_atoms[i],
         )
+
+
+class MyDatasetPngWithDistribution:
+    """Class that generate a dataset for DataLoader module, given as input the paths of the .png files and the respective labels"""
+
+    def __init__(
+        self,
+        paths,
+        targets,
+        resolution=160,
+        enlargement_method="padding",
+    ):
+        self.paths = paths
+        self.targets = targets
+        self.resolution = resolution
+        self.enlargement_method = enlargement_method
+
+    def __len__(self):
+        return len(self.paths)
+
+    def __getitem__(self, i):
+        img = cv2.imread(str(self.paths[i]), -1)
+        if self.enlargement_method == "padding":
+            img = Utils.padding_image(img, size=self.resolution)
+        elif self.enlargement_method == "resize":
+            img = cv2.resize(
+                img, (self.resolution, self.resolution), interpolation=cv2.INTER_CUBIC
+            )
+        img = np.asarray(img, float) / 255.0
+
+        target = np.array(float(self.targets[i]))
+
+        n_atoms = np.loadtxt((self.paths[i]).with_suffix(".txt"))
+
+        distribution = np.loadtxt(
+            (self.paths[i]).with_name(f"{(self.paths[i]).stem}_distribution.txt")
+        )
+        norm = np.linalg.norm(distribution)
+        distribution_normalized = distribution / norm
+
+        if len(img.shape) == 2:
+            return (
+                torch.from_numpy(np.expand_dims(img.copy(), 0)).float(),
+                torch.from_numpy(n_atoms).float(),
+                torch.from_numpy(target).float(),
+                torch.from_numpy(distribution_normalized).float(),
+            )
+        elif len(img.shape) == 3 and img.shape[2] == 3:
+            return (
+                torch.squeeze(
+                    torch.from_numpy(np.expand_dims(img.copy(), 0))
+                    .permute(0, 3, 1, 2)
+                    .float()
+                ),
+                torch.from_numpy(n_atoms).float(),
+                torch.from_numpy(target).float(),
+                torch.from_numpy(distribution_normalized).float(),
+            )
+        else:
+            raise Exception("Wrong dimensions for the input images\n")
 
 
 if __name__ == "__main__":
