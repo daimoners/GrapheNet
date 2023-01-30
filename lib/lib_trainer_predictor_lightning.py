@@ -33,15 +33,30 @@ class MyRegressor(pl.LightningModule):
         if self.normalize == "z_score":
             mean_std = np.loadtxt(
                 str(
-                    Path(cfg.train.spath).joinpath("train", "mean_std_total_energy.txt")
+                    Path(cfg.train.spath).joinpath(
+                        "train", f"mean_std_{self.target}.txt"
+                    )
                 )
             )
             self.mean, self.std = mean_std[0], mean_std[1]
-        if self.normalize == "normalization":
+        elif self.normalize == "normalization":
             min_max = np.loadtxt(
-                str(Path(cfg.train.spath).joinpath("train", "min_max_total_energy.txt"))
+                str(
+                    Path(cfg.train.spath).joinpath(
+                        "train", f"min_max_{self.target}.txt"
+                    )
+                )
             )
             self.min, self.max = min_max[0], min_max[1]
+        elif self.normalize == "log":
+            minimum = np.loadtxt(
+                str(
+                    Path(cfg.train.spath).joinpath(
+                        "train", f"minimum_{self.target}.txt"
+                    )
+                )
+            )
+            self.min = np.abs(minimum)
 
         self.min_val_loss = float("inf")
 
@@ -106,8 +121,10 @@ class MyRegressor(pl.LightningModule):
 
         if self.normalize == "z_score":
             target = (target - self.mean) / self.std
-        if self.normalize == "normalization":
+        elif self.normalize == "normalization":
             target = (target - self.min) / (self.max - self.min)
+        elif self.normalize == "log":
+            target = torch.log(target + (self.min + 1))
 
         return (
             torch.sqrt(l2(output, target))
@@ -133,8 +150,10 @@ class MyRegressor(pl.LightningModule):
 
         if self.normalize == "z_score":
             output = (output * self.std) + self.mean
-        if self.normalize == "normalization":
+        elif self.normalize == "normalization":
             output = output * (self.max - self.min) + self.min
+        elif self.normalize == "log":
+            output = torch.exp(output) - (self.min + 1)
 
         error = torch.abs(output - target) / torch.abs(target) * 100.0
 

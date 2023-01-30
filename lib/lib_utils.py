@@ -514,44 +514,12 @@ class Utils:
         return dt_string
 
     @staticmethod
-    def create_subset_xyz(
-        xyz_path: Path, dpath: Path, n_items: int, targets=["total_energy"]
-    ):
-
-        targets = ["file_name", *targets]
-
-        dpath.mkdir(parents=True, exist_ok=True)
-
-        samples = [x for x in xyz_path.iterdir() if x.suffix == ".xyz"]
-
-        df = pd.read_csv(xyz_path.joinpath("dataset.csv"))
-
-        items = []
-
-        for file in tqdm(random.sample(samples, k=n_items)):
-            shutil.copy(
-                file,
-                dpath.joinpath(file.name),
-            )
-            items.append(file.stem)
-
-        df = df[df["file_name"].isin(items)]
-
-        df = df[targets]
-
-        df.to_csv(dpath.joinpath("dataset.csv"))
-
-        Utils.dataset_max_and_min(spath=dpath, dpath=dpath)
-
-        print("Done")
-
-    @staticmethod
     def compute_min_max_target(
         csv_path: Path, target="total_energy", all_positive=False
     ):
         dataset = pd.read_csv(str(csv_path))
 
-        total_energy = (
+        target_array = (
             np.abs(np.asarray(dataset[target]))
             if all_positive
             else np.asarray(dataset[target])
@@ -559,12 +527,12 @@ class Utils:
 
         np.savetxt(
             str(csv_path.parent.joinpath(f"min_max_{target}.txt")),
-            [np.min(total_energy), np.max(total_energy)],
+            [np.min(target_array), np.max(target_array)],
         )
 
         print(f"Path: {csv_path}")
-        print(f"Min: {np.min(total_energy)}")
-        print(f"Max: {np.max(total_energy)}")
+        print(f"Min: {np.min(target_array)}")
+        print(f"Max: {np.max(target_array)}")
 
     @staticmethod
     def compute_mean_std_target(
@@ -572,7 +540,7 @@ class Utils:
     ):
         dataset = pd.read_csv(str(csv_path))
 
-        total_energy = (
+        target_array = (
             np.abs(np.asarray(dataset[target]))
             if all_positive
             else np.asarray(dataset[target])
@@ -580,12 +548,28 @@ class Utils:
 
         np.savetxt(
             str(csv_path.parent.joinpath(f"mean_std_{target}.txt")),
-            [np.mean(total_energy), np.std(total_energy)],
+            [np.mean(target_array), np.std(target_array)],
         )
 
         print(f"Path: {csv_path}")
-        print(f"Mean: {np.mean(total_energy)}")
-        print(f"STD: {np.std(total_energy)}")
+        print(f"Mean: {np.mean(target_array)}")
+        print(f"STD: {np.std(target_array)}")
+
+    @staticmethod
+    def compute_minimum_target(
+        csv_path: Path, target="total_energy", all_positive=False
+    ):
+        dataset = pd.read_csv(str(csv_path))
+
+        target_array = np.asarray(dataset[target])
+
+        np.savetxt(
+            str(csv_path.parent.joinpath(f"minimum_{target}.txt")),
+            [np.min(target_array)],
+        )
+
+        print(f"Path: {csv_path}")
+        print(f"Minimum: {np.min(target_array)}")
 
     @staticmethod
     def generate_num_atoms(dataset_path: Path, xyz_path: Path, format=".png"):
@@ -636,44 +620,7 @@ class Utils:
         plt.savefig(str(dpath))
 
     @staticmethod
-    def drop_outliers(
-        spath: Path,
-        dpath: Path,
-        targets: list = [
-            "total_energy",
-            "ionization_potential",
-            "electronegativity",
-            "electron_affinity",
-            "band_gap",
-            "Fermi_energy",
-        ],
-    ):
-
-        dpath.mkdir(parents=True, exist_ok=True)
-
-        dataframe = pd.read_csv(str(spath.joinpath("dataset.csv")))
-
-        print("Dropping outliers from the dataset...\n")
-
-        indices = []
-
-        for t in targets:
-            idx = dataframe.index[dataframe[t] == 0.0].tolist()
-            indices = [*indices, *idx]
-
-        dataframe = dataframe.drop(indices, axis=0)
-
-        files = dataframe["file_name"].tolist()
-
-        for f in tqdm(files):
-            shutil.copy(
-                str(spath.joinpath(f"{f}.xyz")), str(dpath.joinpath(f"{f}.xyz"))
-            )
-
-        dataframe.to_csv(dpath.joinpath("dataset.csv"))
-
-    @staticmethod
-    def drop_custom(
+    def drop_custom(  #! DEPRECATED
         spath: Path,
         dpath: Path,
         targets: list = [
@@ -729,6 +676,168 @@ class Utils:
             )
 
         dataframe.to_csv(dpath.joinpath("dataset.csv"))
+
+    @staticmethod
+    def drop_by_oxygen_distribution(
+        csv_path: Path,
+        xyz_path: Path,
+        threshold: float = 0.15,
+        targets: list = [
+            "electronegativity",
+            "total_energy",
+            "electron_affinity",
+            "ionization_potential",
+            "Fermi_energy",
+        ],
+    ) -> pd.DataFrame:
+
+        MAX, MIN = OxygenUtils.find_max_min_distribution(csv_path, xyz_path, targets)
+
+        df = pd.read_csv(str(csv_path))
+
+        df = Utils.drop_nan_and_zeros(df, targets)
+
+        names = df["file_name"].tolist()
+
+        distribution = []
+        d = []
+
+        for file in tqdm(names):
+
+            X, Y, Z, atoms = Utils.read_from_xyz_file(xyz_path.joinpath(file + ".xyz"))
+
+            distribution.clear()
+
+            for i in range(len(X)):
+                if atoms[i] == "O":
+                    d.clear()
+                    for j in range(len(X)):
+                        if atoms[j] == "O" and i != j:
+                            P1 = [X[i], Y[i]]
+                            P2 = [X[j], Y[j]]
+                            d.append(math.dist(P1, P2))
+
+                    distribution.append((np.mean(d) - MIN) / (MAX - MIN))
+
+            if np.mean(distribution) <= threshold:
+                names.remove(file)
+
+        print(f"Lenght of the dataset after dropping the outliers: {len(names)}")
+
+        df = df[df["file_name"].isin(names)]
+
+        return df
+
+    @staticmethod
+    def drop_nan_and_zeros(df: pd.DataFrame, targets: list) -> pd.DataFrame:
+        df = df.dropna(subset=targets)
+
+        indices = []
+        for t in targets:
+            idx = df.index[df[t] == 0.0].tolist()
+            indices = [*indices, *idx]
+        df = df.drop(indices, axis=0)
+
+        return df
+
+    @staticmethod
+    def create_subset_xyz(
+        xyz_path: Path,
+        dpath: Path,
+        n_items: int,
+        targets=[
+            "electronegativity",
+            "total_energy",
+            "electron_affinity",
+            "ionization_potential",
+            "Fermi_energy",
+            "band_gap",
+        ],
+        oxygen_distribution_threshold: float | None = None,
+    ):
+
+        targets = ["file_name", *targets]
+
+        dpath.mkdir(parents=True, exist_ok=True)
+
+        if oxygen_distribution_threshold is None:
+
+            samples = [x for x in xyz_path.iterdir() if x.suffix == ".xyz"]
+
+            df = pd.read_csv(xyz_path.joinpath("dataset.csv"))
+
+            df = Utils.drop_nan_and_zeros(df, targets)
+
+            items = []
+
+            for file in tqdm(random.sample(samples, k=n_items)):
+                shutil.copy(
+                    file,
+                    dpath.joinpath(file.name),
+                )
+                items.append(file.stem)
+
+            df = df[df["file_name"].isin(items)]
+
+            df = df[targets]
+
+            df.to_csv(dpath.joinpath("dataset.csv"))
+
+        else:
+
+            df = Utils.drop_by_oxygen_distribution(
+                csv_path=xyz_path.joinpath("dataset.csv"),
+                xyz_path=xyz_path,
+                threshold=oxygen_distribution_threshold,
+                targets=targets,
+            )
+
+            df.to_csv(dpath.joinpath("dataset.csv"))
+
+            names = df["file_name"].tolist()
+
+            items = []
+
+            for file in tqdm(random.sample(names, k=n_items)):
+                shutil.copy(
+                    xyz_path.joinpath(file + ".xyz"),
+                    dpath.joinpath(file + ".xyz"),
+                )
+                items.append(file)
+
+            df = df[df["file_name"].isin(items)]
+
+            df = df[targets]
+
+            df.to_csv(dpath.joinpath("dataset.csv"))
+
+        Utils.dataset_max_and_min(spath=dpath, dpath=dpath)
+
+        print("Done")
+
+    @staticmethod
+    def update_yaml(spath: Path, new_value: float | str, target_key="base_lr"):
+        def search_and_modify(data, target_key, new_value):
+            for key, value in data.items():
+                if key == target_key:
+                    data[key] = new_value
+                    return True
+                elif type(value) is dict:
+                    if search_and_modify(value, target_key, new_value):
+                        return True
+            return False
+
+        # Open the YAML file
+        with open(str(spath), "r") as file:
+            # Load the YAML data into a Python dictionary
+            data = yaml.load(file, Loader=yaml.FullLoader)
+
+        if search_and_modify(data, target_key, new_value):
+            with open(str(spath), "w") as file:
+                yaml.dump(data, file)
+            print(f"{target_key} value changed to {new_value}")
+        else:
+            print(f"{target_key} not found in the file")
 
 
 class CoulombUtils:
@@ -954,9 +1063,27 @@ class OxygenUtils:
         return distribution_means
 
     @staticmethod
-    def find_max_min_distribution(csv_path: Path, xyz_path: Path):
+    def find_max_min_distribution(
+        csv_path: Path,
+        xyz_path: Path,
+        targets: list = [
+            "electronegativity",
+            "total_energy",
+            "electron_affinity",
+            "ionization_potential",
+            "Fermi_energy",
+        ],
+    ):
         print("Finding MAX and MIN value of the oxygen distribution...\n")
         df = pd.read_csv(str(csv_path))
+        df = df.dropna(subset=targets)
+
+        indices = []
+        for t in targets:
+            idx = df.index[df[t] == 0.0].tolist()
+            indices = [*indices, *idx]
+        df = df.drop(indices, axis=0)
+
         names = df["file_name"].tolist()
 
         max_distribution = []
@@ -1070,19 +1197,19 @@ class OxygenUtils:
         plt.savefig(str(dpath.joinpath("line_exp.png")))
         plt.close()
 
-        # plt.hist(
-        #     distribution,
-        #     bins=[0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0],
-        # )
+        plt.hist(
+            distribution,
+            bins=30,
+        )
 
-        # # Add labels and title
-        # plt.xlabel("Mean Distribution")
-        # plt.ylabel("Frequency")
-        # plt.title("Histogram of Data")
+        # Add labels and title
+        plt.xlabel("Mean Distribution")
+        plt.ylabel("Frequency")
+        plt.title("Histogram of Data")
 
-        # # Show the plot
-        # plt.savefig(str(dpath.joinpath("distribution_means.png")))
-        # plt.close()
+        # Show the plot
+        plt.savefig(str(dpath.joinpath("distribution_means.png")))
+        plt.close()
 
     @staticmethod
     def copy_distributions(dataset_path: Path, distribution_path: Path):

@@ -9,45 +9,20 @@ try:
         TuneReportCheckpointCallback,
     )
     from lib.lib_trainer_predictor_lightning import MyRegressor, MyDataloader
+    from lib.lib_utils import Utils
     from pytorch_lightning import Trainer
-    import math
+    import shutil
     import hydra
     from ray.tune.search.optuna import OptunaSearch
     from pytorch_lightning import Trainer, seed_everything
     import yaml
     from pathlib import Path
+    import time
+    import subprocess
 
 except Exception as e:
 
     print("Some module are missing {}".format(e))
-
-
-def update_yaml(new_value, target_key="base_lr"):
-    def search_and_modify(data, target_key, new_value):
-        for key, value in data.items():
-            if key == target_key:
-                data[key] = new_value
-                return True
-            elif type(value) is dict:
-                if search_and_modify(value, target_key, new_value):
-                    return True
-        return False
-
-    # Open the YAML file
-    with open(
-        str(Path().resolve().joinpath("config", "train_predict.yaml")), "r"
-    ) as file:
-        # Load the YAML data into a Python dictionary
-        data = yaml.load(file, Loader=yaml.FullLoader)
-
-    if search_and_modify(data, target_key, new_value):
-        with open(
-            str(Path().resolve().joinpath("config", "train_predict.yaml")), "w"
-        ) as file:
-            yaml.dump(data, file)
-        print(f"{target_key} value changed to {new_value}")
-    else:
-        print(f"{target_key} not found in the file")
 
 
 @hydra.main(version_base="1.2", config_path="config", config_name="train_predict")
@@ -80,6 +55,7 @@ def main(cfg):
                         on="validation_end",
                     )
                 ],
+                enable_progress_bar=False,
             )
         else:
             trainer = Trainer(
@@ -97,6 +73,7 @@ def main(cfg):
                         on="validation_end",
                     )
                 ],
+                enable_progress_bar=False,
             )
         trainer.fit(model, dataloaders)
 
@@ -129,6 +106,7 @@ def main(cfg):
         )
         resources_per_trial = {"cpu": 1, "gpu": gpus_per_trial}
 
+        start = time.time()
         analysis = tune.run(
             train_fn_with_parameters,
             resources_per_trial=resources_per_trial,
@@ -141,16 +119,37 @@ def main(cfg):
             name=f"{cfg.target}_tune_asha",
             search_alg=OptunaSearch(),
         )
+        end = time.time()
+
+        results = {"optimization_time": float((end - start) / 60)}
+        results.update(analysis.best_config)
 
         print("Best hyperparameters found were: ", analysis.best_config)
         with open(
             str(Path(cfg.train.spath).joinpath(f"{cfg.target}_best_config.yaml")), "w"
         ) as outfile:
-            yaml.dump(analysis.best_config, outfile)
-        update_yaml(new_value=analysis.best_config["lr"])
+            yaml.dump(results, outfile)
+        Utils.update_yaml(
+            spath=Path().resolve().joinpath("config", "train_predict.yaml"),
+            target_key="base_lr",
+            new_value=analysis.best_config["lr"],
+        )
 
+    if Path.home().joinpath("ray_results", f"{cfg.target}_tune_asha").is_dir():
+        shutil.rmtree(
+            str(Path.home().joinpath("ray_results", f"{cfg.target}_tune_asha"))
+        )
     tune_model_asha()
 
 
 if __name__ == "__main__":
     main()
+    process = subprocess.Popen(
+        ["python", str(Path().resolve().joinpath("train_lightning.py"))]
+    )
+    process.wait()
+
+    process = subprocess.Popen(
+        ["python", str(Path().resolve().joinpath("predict_lightning.py"))]
+    )
+    process.wait()
