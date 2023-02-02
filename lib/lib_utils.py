@@ -18,6 +18,7 @@ try:
     import math
     from scipy.stats import pearsonr, spearmanr, kendalltau
     import yaml
+    from sklearn.model_selection import StratifiedShuffleSplit, train_test_split
 
 except Exception as e:
 
@@ -217,15 +218,129 @@ class Utils:
 
         return max, min
 
+    # @staticmethod
+    # def train_val_test_split_png( #!DEPRECATED
+    #     spath: Path,
+    #     dpath: Path,
+    #     csv: Path,
+    #     features: list,
+    #     split: float = 0.7,
+    #     val_split: float = 0.15,
+    #     shuffle: bool = False,
+    # ):
+    #     """Split a dataset in test and train and generate the respective CSV files"""
+
+    #     train_path = dpath.joinpath("train")
+    #     test_path = dpath.joinpath("test")
+    #     val_path = dpath.joinpath("val")
+
+    #     train_path.mkdir(parents=True, exist_ok=True)
+    #     test_path.mkdir(parents=True, exist_ok=True)
+    #     val_path.mkdir(parents=True, exist_ok=True)
+
+    #     data = pd.read_csv(csv)
+    #     n_items = len(data.index)
+
+    #     n_train = round(split * n_items)
+    #     n_val = round(val_split * n_items)
+    #     n_test = n_items - n_train - n_val
+
+    #     print(
+    #         f"Train items = {n_train}, Validation items = {n_val}, Test items = {n_test}\n"
+    #     )
+
+    #     if shuffle:
+    #         indices = random.sample(range(n_items), n_items)
+
+    #     # Start moving train sample
+
+    #     pbar = tqdm(total=n_train)
+    #     for i in range(n_train):
+    #         file = (
+    #             data["file_name"][i] + ".png"
+    #             if not shuffle
+    #             else data["file_name"][indices[i]] + ".png"
+    #         )
+    #         shutil.copy(spath.joinpath(file), train_path.joinpath(file))
+    #         pbar.update(1)
+    #     pbar.close()
+
+    #     train_csv = (
+    #         data.loc[0:(n_train), features]
+    #         if not shuffle
+    #         else data.loc[data.index[indices[0:(n_train)]], features]
+    #     )
+    #     train_csv.to_csv(train_path.joinpath("train.csv"))
+
+    #     print("Train files moved\n")
+
+    #     # Start moving validation sample
+
+    #     pbar = tqdm(total=n_val)
+    #     for i in range(n_val):
+    #         file = (
+    #             data["file_name"][i + n_train] + ".png"
+    #             if not shuffle
+    #             else data["file_name"][indices[i + n_train]] + ".png"
+    #         )
+    #         shutil.copy(spath.joinpath(file), val_path.joinpath(file))
+    #         pbar.update(1)
+    #     pbar.close()
+
+    #     val_csv = (
+    #         data.loc[(n_train) : (n_train + n_val), features]
+    #         if not shuffle
+    #         else data.loc[data.index[indices[(n_train) : (n_train + n_val)]], features]
+    #     )
+    #     val_csv.to_csv(val_path.joinpath("val.csv"))
+
+    #     print("Validation files moved\n")
+
+    #     # Start moving test sample
+
+    #     pbar = tqdm(total=n_test)
+    #     for i in range(n_test):
+    #         file = (
+    #             data["file_name"][i + n_train + n_val] + ".png"
+    #             if not shuffle
+    #             else data["file_name"][indices[i + n_train + n_val]] + ".png"
+    #         )
+    #         shutil.copy(spath.joinpath(file), test_path.joinpath(file))
+    #         pbar.update(1)
+    #     pbar.close()
+
+    #     test_csv = (
+    #         data.loc[(n_train + n_val) : (n_items + 1), features]
+    #         if not shuffle
+    #         else data.loc[
+    #             data.index[indices[(n_train + n_val) : (n_items + 1)]], features
+    #         ]
+    #     )
+    #     test_csv.to_csv(test_path.joinpath("test.csv"))
+
+    #     shutil.copy(
+    #         csv,
+    #         dpath.joinpath("dataset.csv"),
+    #     )
+
+    #     # try:
+    #     #     shutil.copy(
+    #     #         csv.parent.joinpath("max_min_coordinates.txt"), #! non mi serve questa parte
+    #     #         dpath.joinpath("max_min_coordinates.txt"),
+    #     #     )
+    #     # except:
+    #     #     pass
+
+    #     print("Test files moved\n")
+
     @staticmethod
     def train_val_test_split_png(
         spath: Path,
         dpath: Path,
         csv: Path,
         features: list,
-        split: float = 0.7,
-        val_split: float = 0.15,
-        shuffle: bool = False,
+        split: list = 0.7,
+        suffix: str = ".png",
     ):
         """Split a dataset in test and train and generate the respective CSV files"""
 
@@ -237,85 +352,120 @@ class Utils:
         test_path.mkdir(parents=True, exist_ok=True)
         val_path.mkdir(parents=True, exist_ok=True)
 
-        data = pd.read_csv(csv)
-        n_items = len(data.index)
+        df = pd.read_csv(csv)
 
-        n_train = round(split * n_items)
-        n_val = round(val_split * n_items)
-        n_test = n_items - n_train - n_val
+        X = np.zeros(len(df))
 
-        print(
-            f"Train items = {n_train}, Validation items = {n_val}, Test items = {n_test}\n"
+        y = df[features[0]]
+
+        # Split the data into training and test sets
+        (
+            X_train,
+            X_test,
+            y_train,
+            y_test,
+            train_indices,
+            test_indices,
+        ) = train_test_split(X, y, df.index, test_size=1 - split, random_state=42)
+
+        # Split the test set into validation and test sets
+        X_val, X_test, y_val, y_test, val_indices, test_indices = train_test_split(
+            X_test, y_test, test_indices, test_size=0.5, random_state=42
         )
-
-        if shuffle:
-            indices = random.sample(range(n_items), n_items)
 
         # Start moving train sample
 
-        pbar = tqdm(total=n_train)
-        for i in range(n_train):
-            file = (
-                data["file_name"][i] + ".png"
-                if not shuffle
-                else data["file_name"][indices[i]] + ".png"
+        train_csv = df.loc[train_indices, features]
+        names = train_csv["file_name"].tolist()
+        for name in tqdm(names):
+            shutil.copy(
+                spath.joinpath(name + suffix), train_path.joinpath(name + suffix)
             )
-            shutil.copy(spath.joinpath(file), train_path.joinpath(file))
-            pbar.update(1)
-        pbar.close()
-
-        train_csv = (
-            data.loc[0:(n_train), features]
-            if not shuffle
-            else data.loc[data.index[indices[0:(n_train)]], features]
-        )
         train_csv.to_csv(train_path.joinpath("train.csv"))
 
         print("Train files moved\n")
 
         # Start moving validation sample
 
-        pbar = tqdm(total=n_val)
-        for i in range(n_val):
-            file = (
-                data["file_name"][i + n_train] + ".png"
-                if not shuffle
-                else data["file_name"][indices[i + n_train]] + ".png"
-            )
-            shutil.copy(spath.joinpath(file), val_path.joinpath(file))
-            pbar.update(1)
-        pbar.close()
-
-        val_csv = (
-            data.loc[(n_train) : (n_train + n_val), features]
-            if not shuffle
-            else data.loc[data.index[indices[(n_train) : (n_train + n_val)]], features]
-        )
+        val_csv = df.loc[val_indices, features]
+        names = val_csv["file_name"].tolist()
+        for name in tqdm(names):
+            shutil.copy(spath.joinpath(name + suffix), val_path.joinpath(name + suffix))
         val_csv.to_csv(val_path.joinpath("val.csv"))
 
         print("Validation files moved\n")
 
         # Start moving test sample
 
-        pbar = tqdm(total=n_test)
-        for i in range(n_test):
-            file = (
-                data["file_name"][i + n_train + n_val] + ".png"
-                if not shuffle
-                else data["file_name"][indices[i + n_train + n_val]] + ".png"
+        test_csv = df.loc[test_indices, features]
+        names = test_csv["file_name"].tolist()
+        for name in tqdm(names):
+            shutil.copy(
+                spath.joinpath(name + suffix), test_path.joinpath(name + suffix)
             )
-            shutil.copy(spath.joinpath(file), test_path.joinpath(file))
-            pbar.update(1)
-        pbar.close()
-
-        test_csv = (
-            data.loc[(n_train + n_val) : (n_items + 1), features]
-            if not shuffle
-            else data.loc[
-                data.index[indices[(n_train + n_val) : (n_items + 1)]], features
-            ]
-        )
         test_csv.to_csv(test_path.joinpath("test.csv"))
+
+        print("Test files moved\n")
+
+        df = df.loc[:, features]
+        df.to_csv(dpath.joinpath("dataset.csv"))
+
+    @staticmethod
+    def stratified_train_val_test_split_png(
+        spath: Path,
+        dpath: Path,
+        csv: Path,
+        features: list,
+        target_focus: str,
+        split: float = 0.7,
+        val_split: float = 0.15,
+    ):
+        """Split a dataset in test and train and generate the respective CSV files"""
+
+        print("Stratified split...")
+
+        train_path = dpath.joinpath("train")
+        test_path = dpath.joinpath("test")
+        val_path = dpath.joinpath("val")
+
+        train_path.mkdir(parents=True, exist_ok=True)
+        test_path.mkdir(parents=True, exist_ok=True)
+        val_path.mkdir(parents=True, exist_ok=True)
+
+        train_csv, val_csv, test_csv = Utils.stratified_split(
+            csv_path=csv, target=target_focus, split=[split, val_split, val_split]
+        )
+
+        # Start moving train sample
+        names = train_csv["file_name"].tolist()
+
+        for name in tqdm(names):
+            shutil.copy(
+                spath.joinpath(name + ".png"), train_path.joinpath(name + ".png")
+            )
+        train_csv = train_csv.loc[:, features]
+        train_csv.to_csv(train_path.joinpath("train.csv"))
+        print("Train files moved\n")
+
+        # Start moving validation sample
+        names = val_csv["file_name"].tolist()
+
+        for name in tqdm(names):
+            shutil.copy(spath.joinpath(name + ".png"), val_path.joinpath(name + ".png"))
+        val_csv = val_csv.loc[:, features]
+        val_csv.to_csv(val_path.joinpath("val.csv"))
+        print("Validation files moved\n")
+
+        # Start moving test sample
+        names = test_csv["file_name"].tolist()
+
+        for name in tqdm(names):
+            shutil.copy(
+                spath.joinpath(name + ".png"), test_path.joinpath(name + ".png")
+            )
+        test_csv = test_csv.loc[:, features]
+        test_csv.to_csv(test_path.joinpath("test.csv"))
+        print("Test files moved\n")
 
         shutil.copy(
             csv,
@@ -605,6 +755,14 @@ class Utils:
 
     @staticmethod
     def plot_fit(y: list, y_hat: list, dpath: Path, target: str):
+        def r2_score(y_pred, y_true):
+            y_pred = np.array(y_pred)
+            y_true = np.array(y_true)
+            mean_y = np.mean(y_true)
+            SSR = np.sum((y_pred - y_true) ** 2)
+            SST = np.sum((y_true - mean_y) ** 2)
+            return 1 - SSR / SST
+
         min = np.min([np.min(y), np.min(y_hat)])
         max = np.max([np.max(y), np.max(y_hat)])
 
@@ -616,66 +774,33 @@ class Utils:
         plt.scatter(y_hat, y, color="red")
         plt.xlabel("Predictions")
         plt.ylabel("Targets")
-        plt.title(f"{target}")
+        plt.title(f"{target} - R2 = {r2_score(y_hat,y):.3f}")
         plt.savefig(str(dpath))
 
     @staticmethod
-    def drop_custom(  #! DEPRECATED
-        spath: Path,
-        dpath: Path,
-        targets: list = [
-            "total_energy",
-            "ionization_potential",
-            "electronegativity",
-            "electron_affinity",
-            "band_gap",
-            "Fermi_energy",
-        ],
+    def drop_custom(
+        df: pd.DataFrame,
     ):
-        dpath.mkdir(parents=True, exist_ok=True)
-
-        dataframe = pd.read_csv(str(spath.joinpath("dataset.csv")))
 
         print("Dropping outliers from the dataset...\n")
 
-        indices = []
-
-        for t in targets:
-            idx = dataframe.index[dataframe[t] == 0.0].tolist()
-            indices = [*indices, *idx]
-
-        el_aff_down = dataframe.index[dataframe["electron_affinity"] <= -6.8].tolist()
-        el_aff_up = dataframe.index[dataframe["electron_affinity"] >= -4.8].tolist()
+        el_aff_down = df.index[df["electron_affinity"] <= -7].tolist()
+        el_aff_up = df.index[df["electron_affinity"] >= -3.5].tolist()
         el_aff = [*el_aff_down, *el_aff_up]
 
-        elneg_down = dataframe.index[dataframe["electronegativity"] <= -6.1].tolist()
-        elneg_up = dataframe.index[dataframe["electronegativity"] >= -4.5].tolist()
+        elneg_down = df.index[df["electronegativity"] <= -6.5].tolist()
+        elneg_up = df.index[df["electronegativity"] >= -3.5].tolist()
         elneg = [*elneg_down, *elneg_up]
 
-        i_pot_down = dataframe.index[dataframe["ionization_potential"] <= -5.5].tolist()
-        i_pot_up = dataframe.index[dataframe["ionization_potential"] >= -3.7].tolist()
+        i_pot_down = df.index[df["ionization_potential"] <= -6.2].tolist()
+        i_pot_up = df.index[df["ionization_potential"] >= -3.5].tolist()
         i_pot = [*i_pot_down, *i_pot_up]
 
-        energy_down = dataframe.index[dataframe["total_energy"] <= -80000].tolist()
-        energy_up = dataframe.index[dataframe["total_energy"] >= 0].tolist()
-        energy = [*energy_down, *energy_up]
+        indices = [*el_aff, *elneg, *i_pot]
 
-        band_gap_down = dataframe.index[dataframe["band_gap"] <= 0.8].tolist()
-        band_gap_up = dataframe.index[dataframe["band_gap"] >= 2.4].tolist()
-        band_gap = [*band_gap_down, *band_gap_up]
+        df = df.drop(indices, axis=0)
 
-        indices = [*indices, *el_aff, *elneg, *i_pot, *energy, *band_gap]
-
-        dataframe = dataframe.drop(indices, axis=0)
-
-        files = dataframe["file_name"].tolist()
-
-        for f in tqdm(files):
-            shutil.copy(
-                str(spath.joinpath(f"{f}.xyz")), str(dpath.joinpath(f"{f}.xyz"))
-            )
-
-        dataframe.to_csv(dpath.joinpath("dataset.csv"))
+        return df
 
     @staticmethod
     def drop_by_oxygen_distribution(
@@ -695,7 +820,7 @@ class Utils:
 
         df = pd.read_csv(str(csv_path))
 
-        df = Utils.drop_nan_and_zeros(df, targets)
+        df = Utils.drop_nan_and_zeros(df)
 
         names = df["file_name"].tolist()
 
@@ -729,7 +854,17 @@ class Utils:
         return df
 
     @staticmethod
-    def drop_nan_and_zeros(df: pd.DataFrame, targets: list) -> pd.DataFrame:
+    def drop_nan_and_zeros(
+        df: pd.DataFrame,
+        targets: list = [
+            "electronegativity",
+            "total_energy",
+            "electron_affinity",
+            "ionization_potential",
+            "Fermi_energy",
+            "band_gap",
+        ],
+    ) -> pd.DataFrame:
         df = df.dropna(subset=targets)
 
         indices = []
@@ -751,7 +886,6 @@ class Utils:
             "electron_affinity",
             "ionization_potential",
             "Fermi_energy",
-            "band_gap",
         ],
         oxygen_distribution_threshold: float | None = None,
     ):
@@ -760,13 +894,18 @@ class Utils:
 
         dpath.mkdir(parents=True, exist_ok=True)
 
-        if oxygen_distribution_threshold is None:
+        if (
+            oxygen_distribution_threshold is None
+            or oxygen_distribution_threshold == 0.0
+        ):
 
             samples = [x for x in xyz_path.iterdir() if x.suffix == ".xyz"]
 
             df = pd.read_csv(xyz_path.joinpath("dataset.csv"))
 
-            df = Utils.drop_nan_and_zeros(df, targets)
+            df = Utils.drop_nan_and_zeros(df)
+
+            df = Utils.drop_custom(df)
 
             items = []
 
@@ -838,6 +977,93 @@ class Utils:
             print(f"{target_key} value changed to {new_value}")
         else:
             print(f"{target_key} not found in the file")
+
+    @staticmethod
+    def stratified_split(
+        csv_path: Path, target: str, split: list = [0.7, 0.15, 0.15]
+    ):  #! questo serve per fare meglio lo split
+        def assign_classes(array, start, stop, step=1):
+            # Define the range for each class
+
+            class_ranges = [
+                (start + i * step, start + (i + 1) * step)
+                for i in range(int((stop - start) / step))
+            ]
+
+            # Create an empty list to store the classes
+            classes = []
+
+            # Loop through each float value in the array
+            for value in array:
+                # Loop through each class range
+                for i, (low, high) in enumerate(class_ranges):
+                    # If the value falls within the class range, add the class label to the list
+                    if low < value <= high:
+                        classes.append(i)
+                        break
+
+            # Return the list of classes as a numpy array
+            return np.array(classes)
+
+        df = pd.read_csv(csv_path)
+
+        df = Utils.drop_nan_and_zeros(df)
+
+        X = np.zeros(len(df))
+
+        y = df[target].values
+        print(len(y))
+        max = np.max(y) + 0.5
+        min = np.min(y) - 0.5
+        y = assign_classes(y, start=min, stop=max, step=1)
+
+        # Split the data into training, validation, and test sets for target 1
+        sss = StratifiedShuffleSplit(n_splits=1, test_size=0.3)
+
+        for train_index, test_valid_index in sss.split(X, y):
+            df_train, df_test_valid = (
+                df.iloc[train_index],
+                df.iloc[test_valid_index],
+            )
+            X_train, X_test_valid = X[train_index], X[test_valid_index]
+            y_train, y_test_valid = y[train_index], y[test_valid_index]
+
+        # Split the data into training, validation, and test sets for target 1
+        sss = StratifiedShuffleSplit(n_splits=1, test_size=0.5)
+
+        for valid_index, test_index in sss.split(X_test_valid, y_test_valid):
+            df_val, df_test = (
+                df_test_valid.iloc[valid_index],
+                df_test_valid.iloc[test_index],
+            )
+
+        # df_test.to_csv(csv_path.with_name("test.csv"))
+        # df_val.to_csv(csv_path.with_name("val.csv"))
+        # df_train.to_csv(csv_path.with_name("train.csv"))
+
+        # sns.set_style("white")
+
+        # for i in ["train", "test", "val"]:
+
+        #     if i == "train":
+        #         x = df_train[target]
+        #     elif i == "test":
+        #         x = df_test[target]
+        #     elif i == "val":
+        #         x = df_val[target]
+
+        #     # Plot
+        #     kwargs = dict(hist_kws={"alpha": 0.6}, kde_kws={"linewidth": 2})
+
+        #     plt.figure(figsize=(15, 10), dpi=100)
+        #     try:
+        #         sns.distplot(x, color="purple", label=target, **kwargs)
+        #     except:
+        #         pass
+        #     plt.legend()
+        #     plt.savefig(csv_path.parent.joinpath(f"{i}.png"))
+
+        return df_train, df_val, df_test
 
 
 class CoulombUtils:
@@ -1279,15 +1505,15 @@ if __name__ == "__main__":
     #     xyz_path=Path("/home/cnrismn/git_workspace/Chemception/data/xyz_files_opt"),
     #     dpath=Path(__file__).parent.parent.joinpath("tests", "oxygens"),
     # )
-    OxygenUtils.compute_correlation(
-        csv_path=Path(
-            "/home/cnrismn/git_workspace/Chemception/data/xyz_files_opt/dataset.csv"
-        ),
-        distribution_path=Path(__file__).parent.parent.joinpath(
-            "tests", "oxygens", "distribution_means.txt"
-        ),
-        dpath=Path(__file__).parent.parent.joinpath("tests", "oxygens", "results"),
-    )
+    # OxygenUtils.compute_correlation(
+    #     csv_path=Path(
+    #         "/home/cnrismn/git_workspace/Chemception/data/xyz_files_opt/dataset.csv"
+    #     ),
+    #     distribution_path=Path(__file__).parent.parent.joinpath(
+    #         "tests", "oxygens", "distribution_means.txt"
+    #     ),
+    #     dpath=Path(__file__).parent.parent.joinpath("tests", "oxygens", "results"),
+    # )
     # OxygenUtils.copy_distributions(
     #     dataset_path=Path(__file__).parent.parent.joinpath(
     #         "data_GO", "custom_training_dataset"
@@ -1296,3 +1522,9 @@ if __name__ == "__main__":
     #         "tests", "oxygens", "distributions"
     #     ),
     # )
+    Utils.stratified_split2(
+        csv_path=Path(
+            "/home/cnrismn/git_workspace/GrapheNet/data_GO/training_dataset/dataset.csv"
+        ),
+        target="electron_affinity",
+    )

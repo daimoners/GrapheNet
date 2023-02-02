@@ -58,10 +58,12 @@ class DatasetGenerator(object):
 
         self.package_path = cfg.package_path
 
+        self.target = cfg.target
+
         if not self.csv_flag:
             DatasetGenerator.generate_cropped_png_dataset_from_xyz(
                 spath=self.path_xyz, dpath=self.spath
-            )
+            ) if not self.spath.is_dir() else None
             self.split_dataset()
             Utils.generate_num_atoms(dataset_path=self.dpath, xyz_path=self.path_xyz)
             Utils.find_max_dimensions_png_folder(spath=self.spath, dpath=self.dpath)
@@ -71,15 +73,24 @@ class DatasetGenerator(object):
     def split_dataset(self):
         # split the dataset in train and test set
         print("Splitting the dataset in train/test/validation set...\n")
-        Utils.train_val_test_split_png(
-            self.spath,
-            self.dpath,
-            self.path_csv,
-            features=["file_name", *self.features],
-            split=self.train_split,
-            val_split=self.val_split,
-            shuffle=self.shuffle,
-        )
+        if self.target in self.features:
+            Utils.stratified_train_val_test_split_png(
+                self.spath,
+                self.dpath,
+                self.path_csv,
+                target_focus=self.target,
+                features=["file_name", *self.features],
+                split=self.train_split,
+                val_split=self.val_split,
+            )
+        else:
+            Utils.train_val_test_split_png(
+                self.spath,
+                self.dpath,
+                self.path_csv,
+                features=["file_name", *self.features],
+                split=self.train_split,
+            )
         if self.plot_distributions:
             Utils.plot_distribution(
                 spath=self.dpath.joinpath("train"),

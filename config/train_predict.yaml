@@ -7,9 +7,9 @@ num_workers: 6
 package_path: /home/cnrismn/git_workspace/GrapheNet
 resolution: 160
 sample: None
-target: electron_affinity
+target: ionization_potential
 train:
-  base_lr: 0.02409664478948597
+  base_lr: 0.05803836424334422
   batch_size: 32
   dpath: ${train.spath}/models/${target}
   num_epochs: 150

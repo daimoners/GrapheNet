@@ -125,8 +125,13 @@ def main(cfg):
         results.update(analysis.best_config)
 
         print("Best hyperparameters found were: ", analysis.best_config)
+
+        dpath = Path(cfg.train.dpath)
+        dpath.mkdir(parents=True, exist_ok=True)
+
         with open(
-            str(Path(cfg.train.spath).joinpath(f"{cfg.target}_best_config.yaml")), "w"
+            str(dpath.joinpath(f"{cfg.target}_optimization_results.yaml")),
+            "w",
         ) as outfile:
             yaml.dump(results, outfile)
         Utils.update_yaml(
@@ -144,12 +149,3 @@ def main(cfg):
 
 if __name__ == "__main__":
     main()
-    process = subprocess.Popen(
-        ["python", str(Path().resolve().joinpath("train_lightning.py"))]
-    )
-    process.wait()
-
-    process = subprocess.Popen(
-        ["python", str(Path().resolve().joinpath("predict_lightning.py"))]
-    )
-    process.wait()

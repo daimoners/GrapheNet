@@ -23,7 +23,7 @@ def main(cfg):
         dpath=Path(cfg.path_xyz),
         n_items=7000,
         targets=cfg.features,
-        oxygen_distribution_threshold=cfg.oxygen_outliers_th,
+        oxygen_distribution_threshold=cfg.randomly.oxygen_outliers_th,
     )
 
     dataset = DatasetGenerator(cfg)

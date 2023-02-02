@@ -96,7 +96,7 @@ def main(cfg):
         "training_time": float((end - start) / 60),
     }
     with open(
-        str(Path(cfg.train.dpath).joinpath(f"{cfg.target}_train_data.yaml")), "w"
+        str(Path(cfg.train.dpath).joinpath(f"{cfg.target}_train_results.yaml")), "w"
     ) as outfile:
         yaml.dump(train_data, outfile)
 

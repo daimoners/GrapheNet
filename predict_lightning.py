@@ -59,7 +59,7 @@ def main(cfg):
     with open(
         str(
             Path(cfg.train.dpath).joinpath(
-                f"{cfg.target}_best_results.yaml",
+                f"{cfg.target}_prediction_results.yaml",
             )
         ),
         "w",
@@ -69,7 +69,7 @@ def main(cfg):
     Utils.plot_fit(
         y=model.plot_y,
         y_hat=model.plot_y_hat,
-        dpath=Path(cfg.train.dpath).joinpath(f"{cfg.target}_best_fit.png"),
+        dpath=Path(cfg.train.dpath).joinpath(f"{cfg.target}_fit.png"),
         target=cfg.target,
     )
 
