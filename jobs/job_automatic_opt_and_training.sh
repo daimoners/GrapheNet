@@ -5,9 +5,9 @@
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=0
 #SBATCH --time=72:00:00
-#SBATCH --job-name=train_GrapheNet
-#SBATCH --error=train.error
-#SBATCH --output=train.log
+#SBATCH --job-name=opt_train_GrapheNet
+#SBATCH --error=opt_train.error
+#SBATCH --output=opt_train.log
 #
 #---------------------------------------------------------------------------------------
 
@@ -19,8 +19,6 @@ conda activate pytorch
 
 #INSERT YOUR SCRIPT HERE
 
-echo $SLURM_JOB_ID > train.output
+echo $SLURM_JOB_ID > opt_train.output
 
-srun python /home/tommaso/git_workspace/GrapheNet/train_lightning.py > train.output
-
-srun python /home/tommaso/git_workspace/GrapheNet/predict_lightning.py > predict.output
+srun python /home/tommaso/git_workspace/GrapheNet/automatic_opt_and_training.py > opt_train.output

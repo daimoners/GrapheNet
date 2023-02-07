@@ -86,6 +86,38 @@ def plot_filters(model_weights, save_path: Path):
     plt.close()
 
 
+def inception_plot_filters(model_weights, save_path: Path):
+
+    filters_path = save_path.joinpath("filters")
+    filters_path.mkdir(parents=True, exist_ok=True)
+
+    print("Plotting filters...")
+    layers = {
+        0: "conv1_64",
+        1: "conv3_64",
+        2: "conv5_64",
+        3: "conv1_128",
+        4: "conv3_128",
+        5: "conv5_128",
+        6: "conv1_256",
+        7: "conv3_256",
+        8: "conv5_256",
+    }
+    for k in range(0, len(model_weights)):
+        plt.figure(figsize=(15, 15))
+        for i, filter in enumerate(model_weights[k]):
+            if k in [0, 1, 2]:
+                plt.subplot(8, 8, i + 1)
+            elif k in [3, 4, 5]:
+                plt.subplot(12, 12, i + 1)
+            elif k in [6, 7, 8]:
+                plt.subplot(16, 16, i + 1)
+            plt.imshow(filter[0, :, :].detach().cpu(), cmap="gray")
+            plt.axis("off")
+            plt.savefig(str(filters_path.joinpath(f"filter_{layers[k]}.png")))
+        plt.close()
+
+
 def plot_feature_maps(conv_layers, image, save_path: Path, num_filters: int = 10):
 
     print("Plotting feature maps...")
@@ -112,6 +144,63 @@ def plot_feature_maps(conv_layers, image, save_path: Path, num_filters: int = 10
             if i == num_filters:  # we will visualize only 8x8 blocks from each layer
                 break
             plt.imshow(filter.detach().cpu(), cmap="plasma")
+            plt.savefig(
+                str(
+                    feature_maps_path.joinpath(
+                        f"layer_{layers[num_layer]}_filter_{i}.png"
+                    )
+                )
+            )
+        plt.close()
+
+
+def inception_plot_feature_maps(
+    conv_layers, image, save_path: Path, num_filters: int = 10, colormap="seismic"
+):
+
+    print("Plotting feature maps...")
+
+    # pass the image through all the layers
+    results1 = [conv_layers[0](image)]
+    results2 = [conv_layers[1](image)]
+    results3 = [conv_layers[2](image)]
+
+    for i in range(0, int(len(conv_layers) / 3) - 1):
+        # pass the result from the last layer to the next layer
+        complete_result = torch.cat([results1[-1], results2[-1], results3[-1]], dim=1)
+
+        results1.append(conv_layers[i * (i + 2) + 3](complete_result))
+        results2.append(conv_layers[i * (i + 2) + 4](complete_result))
+        results3.append(conv_layers[i * (i + 2) + 5](complete_result))
+    # make a copy of the `results`
+    outputs = [*results1, *results2, *results3]
+
+    feature_maps_path = save_path.joinpath("feature_maps")
+    feature_maps_path.mkdir(parents=True, exist_ok=True)
+
+    layers = {
+        0: "conv1_64",
+        1: "conv3_64",
+        2: "conv5_64",
+        3: "conv1_128",
+        4: "conv3_128",
+        5: "conv5_128",
+        6: "conv1_256",
+        7: "conv3_256",
+        8: "conv5_256",
+    }
+    # visualize "num_filters" features from each layer
+    # (although there are more feature maps in the upper layers)
+    for num_layer in range(len(outputs)):
+        plt.figure(figsize=(5, 5))
+        layer_viz = outputs[num_layer][0, :, :, :]
+        layer_viz = layer_viz.data
+        for i, filter in enumerate(layer_viz):
+            if num_filters == -1:
+                pass
+            elif i == num_filters:  # we will visualize only 8x8 blocks from each layer
+                break
+            plt.imshow(filter.detach().cpu(), cmap=colormap)
             plt.savefig(
                 str(
                     feature_maps_path.joinpath(
@@ -178,6 +267,18 @@ def get_weights_and_layers(model):
     return model_weights, conv_layers
 
 
+def new_get_weights_and_layers(model):
+    model_weights = []
+    conv_layers = []
+    for name, module in model.named_modules():
+        if isinstance(module, nn.Conv2d) and "down" not in name:
+            model_weights.append(module.weight)
+            conv_layers.append(module)
+    print(f"Total convolution layers: {len(conv_layers)}")
+
+    return model_weights, conv_layers
+
+
 def load_model(cfg, checkpoints_path: Path):
     checkpoints = get_model_names(checkpoints_path)
 
@@ -202,16 +303,16 @@ def main(cfg):
         cfg, checkpoints_path=Path(cfg.train.spath).joinpath("models", f"{cfg.target}")
     )
 
-    model_weights, conv_layers = get_weights_and_layers(model)
+    model_weights, conv_layers = new_get_weights_and_layers(model)
 
     image = load_image(Path(cfg.sample), cfg.resolution)
 
-    prediction = make_prediction(model, image, Path(cfg.sample))
+    prediction = make_prediction(model, image, Path(cfg.sample), target=cfg.target)
     print(f"Predicted target: {prediction:.4f}")
 
     shutil.copy(cfg.sample, str(save_path))
-    plot_filters(model_weights, save_path)
-    plot_feature_maps(conv_layers, image, save_path)
+    inception_plot_feature_maps(conv_layers, image, save_path, num_filters=-1)
+    inception_plot_filters(model_weights, save_path)
 
 
 if __name__ == "__main__":

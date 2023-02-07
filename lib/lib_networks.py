@@ -19,6 +19,10 @@ class InceptionBlock(nn.Module):
         self.conv3 = nn.Conv2d(in_channels, out_channels, kernel_size=3, padding=1)
         self.conv5 = nn.Conv2d(in_channels, out_channels, kernel_size=5, padding=2)
 
+        # self.conv1 = nn.Conv2d(in_channels, out_channels, kernel_size=3, padding=1)
+        # self.conv3 = nn.Conv2d(in_channels, out_channels, kernel_size=5, padding=2)
+        # self.conv5 = nn.Conv2d(in_channels, out_channels, kernel_size=7, padding=3)
+
     def forward(self, x):
         # Apply the convolutional layers and max pooling in parallel
         x1 = self.conv1(x)
@@ -35,8 +39,12 @@ class InceptionResNet(nn.Module):
         resolution: int = 160,
         input_channels: int = 3,
         output_channels: int = 2,
-        filters: list = [64, 128, 256],
-        dense_layers: list = [512, 256],
+        filters: list = [
+            32,
+            64,
+            128,
+        ],  # § i migliori risultati li ho ottenuti con [32, 64, 128] e [256, 128]
+        dense_layers: list = [256, 128],
     ):
         super(InceptionResNet, self).__init__()
 
@@ -88,7 +96,7 @@ class InceptionResNet(nn.Module):
         self.batchnorm5 = nn.BatchNorm1d(dense_layers[1])
         self.fc3 = nn.Linear(dense_layers[1], output_channels)
 
-        self.dropout = nn.Dropout(0.5)
+        self.dropout = nn.Dropout(0.25)
 
     def forward(self, x):
 
@@ -648,6 +656,41 @@ class MyDatasetPngCluster:
             self.images[i],
             self.properties[i],
             self.n_atoms[i],
+        )
+
+
+class MyDatasetCoulombCluster:
+    """Class that generate a dataset for DataLoader module, given as input the paths of the .png files and the respective labels"""
+
+    def __init__(
+        self,
+        paths,
+        targets,
+        resolution=160,
+    ):
+        self.paths = paths
+        self.targets = targets
+        self.resolution = resolution
+
+    def __len__(self):
+        return len(self.paths)
+
+    def __getitem__(self, i):
+        coulomb = np.load((self.paths[i]).with_suffix(".npy"))
+        coulomb = coulomb / coulomb.max()
+        # Create a new matrix with larger dimensions
+        coulomb_padded = np.zeros((self.resolution, self.resolution))
+        # Insert the original matrix into the upper left corner of the new matrix
+        coulomb_padded[: coulomb.shape[0], : coulomb.shape[1]] = coulomb
+
+        target = np.array(float(self.targets[i]))
+
+        n_atoms = np.loadtxt((self.paths[i]).with_suffix(".txt"))
+
+        return (
+            torch.from_numpy(np.expand_dims(coulomb_padded.copy(), 0)).float(),
+            torch.from_numpy(n_atoms).float(),
+            torch.from_numpy(target).float(),
         )
 
 

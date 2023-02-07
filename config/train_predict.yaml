@@ -1,15 +1,16 @@
 atom_types: 3
 cluster: false
 cluster_num_workers: 8
+coulomb: false
 enlargement_method: padding
 normalize: None
 num_workers: 6
 package_path: /home/cnrismn/git_workspace/GrapheNet
 resolution: 160
 sample: None
-target: ionization_potential
+target: total_energy
 train:
-  base_lr: 0.05803836424334422
+  base_lr: 0.001
   batch_size: 32
   dpath: ${train.spath}/models/${target}
   num_epochs: 150

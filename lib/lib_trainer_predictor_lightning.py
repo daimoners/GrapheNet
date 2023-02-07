@@ -16,6 +16,7 @@ try:
         MySimpleNet,
         MySimpleResNet,
         DeepCNN,
+        MyDatasetCoulombCluster,
     )
 
 except Exception as e:
@@ -35,6 +36,9 @@ class MyRegressor(pl.LightningModule):
         self.errors = []
         self.plot_y = []
         self.plot_y_hat = []
+        self.coulomb = cfg.coulomb
+        self.num_epochs = cfg.train.num_epochs
+        self.batch_size = cfg.train.batch_size
 
         if self.normalize == "z_score":
             mean_std = np.loadtxt(
@@ -85,7 +89,7 @@ class MyRegressor(pl.LightningModule):
         # )
         self.net = InceptionResNet(
             resolution=cfg.resolution,
-            input_channels=self.atom_types,
+            input_channels=self.atom_types if not self.coulomb else 1,
             output_channels=(self.atom_types + 1)
             if self.target == "total_energy"
             else 1,
@@ -229,6 +233,15 @@ class MyRegressor(pl.LightningModule):
         self.plot_y.clear()
         self.plot_y_hat.clear()
 
+    def on_train_start(self):
+        self.log_dict(
+            {
+                "hp/num_epochs": float(self.num_epochs),
+                "hp/learning_rate": float(self.learning_rate),
+                "hp/batch_size": float(self.batch_size),
+            }
+        )
+
 
 class MyDataloader(pl.LightningDataModule):
     def __init__(self, cfg, config=None):
@@ -245,6 +258,7 @@ class MyDataloader(pl.LightningDataModule):
         self.cluster = cfg.cluster
         self.cluster_num_workers = cfg.cluster_num_workers
         self.enlargement_method = cfg.enlargement_method
+        self.coulomb = cfg.coulomb
 
     def setup(self, stage=None):
         print(stage)
@@ -276,24 +290,41 @@ class MyDataloader(pl.LightningDataModule):
             )
 
         if self.cluster:
-            self.train_data = MyDatasetPngCluster(
-                train_paths,
-                train_dataset[self.target],
-                resolution=self.resolution,
-                enlargement_method=self.enlargement_method,
-            )
-            self.val_data = MyDatasetPngCluster(
-                val_paths,
-                val_dataset[self.target],
-                resolution=self.resolution,
-                enlargement_method=self.enlargement_method,
-            )
-            self.test_data = MyDatasetPngCluster(
-                test_paths,
-                test_dataset[self.target],
-                resolution=self.resolution,
-                enlargement_method=self.enlargement_method,
-            )
+            if self.coulomb:
+                self.train_data = MyDatasetCoulombCluster(
+                    train_paths,
+                    train_dataset[self.target],
+                    resolution=self.resolution,
+                )
+                self.val_data = MyDatasetCoulombCluster(
+                    val_paths,
+                    val_dataset[self.target],
+                    resolution=self.resolution,
+                )
+                self.test_data = MyDatasetCoulombCluster(
+                    test_paths,
+                    test_dataset[self.target],
+                    resolution=self.resolution,
+                )
+            else:
+                self.train_data = MyDatasetPngCluster(
+                    train_paths,
+                    train_dataset[self.target],
+                    resolution=self.resolution,
+                    enlargement_method=self.enlargement_method,
+                )
+                self.val_data = MyDatasetPngCluster(
+                    val_paths,
+                    val_dataset[self.target],
+                    resolution=self.resolution,
+                    enlargement_method=self.enlargement_method,
+                )
+                self.test_data = MyDatasetPngCluster(
+                    test_paths,
+                    test_dataset[self.target],
+                    resolution=self.resolution,
+                    enlargement_method=self.enlargement_method,
+                )
         else:
             self.train_data = MyDatasetPng(
                 train_paths,

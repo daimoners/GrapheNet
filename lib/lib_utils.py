@@ -14,7 +14,6 @@ try:
     from torch.utils.data import DataLoader
     from pathlib import Path
     import matplotlib.pyplot as plt
-    import cupy as cp
     import math
     from scipy.stats import pearsonr, spearmanr, kendalltau
     import yaml
@@ -722,7 +721,12 @@ class Utils:
         print(f"Minimum: {np.min(target_array)}")
 
     @staticmethod
-    def generate_num_atoms(dataset_path: Path, xyz_path: Path, format=".png"):
+    def generate_num_atoms(
+        dataset_path: Path,
+        xyz_path: Path,
+        format: str = ".png",
+        info_max_atoms: bool = False,
+    ):
         """Generate the number and type of atoms in a .txt file for each .xyz file
 
         Args:
@@ -730,6 +734,8 @@ class Utils:
             xyz_path (Path): path of all the .xyz files
             format (str, optional): image format. Defaults to ".png".
         """
+        max_atoms = 0
+        flake_max_atoms = ""
 
         for dir in ["train", "val", "test"]:
             for file in tqdm(dataset_path.joinpath(dir).iterdir()):
@@ -744,6 +750,10 @@ class Utils:
                     n_O = atoms.count("O")
                     n_H = atoms.count("H")
 
+                    if (n_C + n_O + n_H) > max_atoms and info_max_atoms:
+                        max_atoms = n_C + n_O + n_H
+                        flake_max_atoms = file.stem
+
                     lines = []
                     with open(dataset_path.joinpath(dir, file.stem + ".txt"), "w") as f:
 
@@ -752,6 +762,15 @@ class Utils:
                         lines.append(f"{n_H}\n") if n_H > 0 else None
 
                         f.writelines(lines)
+
+        if info_max_atoms:
+            lines.clear()
+            with open(dataset_path.joinpath("flake_max_atoms.txt"), "w") as f:
+
+                lines.append(f"Flake Name = {flake_max_atoms}\n")
+                lines.append(f"Max Atoms = {max_atoms}\n")
+
+                f.writelines(lines)
 
     @staticmethod
     def plot_fit(y: list, y_hat: list, dpath: Path, target: str):
@@ -1068,7 +1087,9 @@ class Utils:
 
 class CoulombUtils:
     @staticmethod
-    def compute_coulomb_matrix(xyz_file: Path, dpath: Path) -> cp.array:
+    def compute_coulomb_matrix(
+        xyz_file: Path, dpath: Path, format: str = ".npy"
+    ) -> np.array:
         """
         Compute the Coulomb matrix of a molecule from the 3D coordinates of its atoms as proposed by Rupp et al. in
         "Fast and Accurate Modeling of Molecular Atomization Energies with Machine Learning" (2012).
@@ -1078,7 +1099,7 @@ class CoulombUtils:
         dpath (Path): The output path for the txt file.
 
         Returns:
-        cp.array : The Coulomb matrix of the molecule
+        np.array : The Coulomb matrix of the molecule
 
         """
         # Read the xyz file and extract the atomic coordinates
@@ -1099,37 +1120,42 @@ class CoulombUtils:
                 coordinates.append([nuclear_charge, x, y, z])
 
         # Compute the Coulomb matrix
-        coordinates = cp.array(coordinates)
-        coulomb_matrix = cp.zeros((num_atoms, num_atoms))
+        coordinates = np.array(coordinates)
+        coulomb_matrix = np.zeros((num_atoms, num_atoms))
         for i in range(num_atoms):
             for j in range(i, num_atoms):
                 if i == j:
                     coulomb_matrix[i, j] = 0.5 * coordinates[i, 0] ** 2.4
                 else:
-                    distance = cp.linalg.norm(coordinates[i, 1:] - coordinates[j, 1:])
+                    distance = np.linalg.norm(coordinates[i, 1:] - coordinates[j, 1:])
                     coulomb_matrix[i, j] = (
                         coordinates[i, 0] * coordinates[j, 0] / distance
                     )
                     coulomb_matrix[j, i] = coulomb_matrix[i, j]
-        eigenvalues = cp.sort(cp.linalg.eigvalsh(coulomb_matrix))[::-1]
+        eigenvalues = np.sort(np.linalg.eigvalsh(coulomb_matrix))[::-1]
         coulomb_matrix_sorted = eigenvalues - eigenvalues[:, None]
 
-        upper_triangular = cp.triu(coulomb_matrix_sorted)
-
-        # Convert the cupy array to numpy array
-        upper_triangular_np = cp.asnumpy(upper_triangular)
-
         # Save the upper triangular matrix to a file
-        np.savetxt(
-            dpath.joinpath(xyz_file.stem + ".txt"),
-            upper_triangular_np,
-            delimiter=",",
-        )
+        if format == ".npy":
+            np.save(
+                dpath.joinpath(xyz_file.stem + format),
+                coulomb_matrix_sorted,
+            )
+        elif format == ".txt":
+            np.savetxt(
+                dpath.joinpath(xyz_file.stem + format),
+                coulomb_matrix_sorted,
+                delimiter=",",
+            )
+        else:
+            raise Exception("Unknown format\n")
 
         return coulomb_matrix_sorted
 
     @staticmethod
-    def fast_compute_coulomb_matrix(xyz_file: Path, dpath: Path) -> cp.array:
+    def fast_compute_coulomb_matrix(
+        xyz_file: Path, dpath: Path, format: str = ".npy"
+    ) -> np.array:
         """
         Compute the Coulomb matrix of a molecule from the 3D coordinates of its atoms, permute the Coulomb matrix in such a way that the rows (and columns) Ci of the Coulomb matrix are ordered by their norm.
 
@@ -1159,34 +1185,37 @@ class CoulombUtils:
                 coordinates.append([nuclear_charge, x, y, z])
 
         # Compute the Coulomb matrix
-        coordinates = cp.array(coordinates)
-        coulomb_matrix = cp.zeros((num_atoms, num_atoms))
+        coordinates = np.array(coordinates)
+        coulomb_matrix = np.zeros((num_atoms, num_atoms))
         for i in range(num_atoms):
             for j in range(i, num_atoms):
                 if i == j:
                     coulomb_matrix[i, j] = 0.5 * coordinates[i, 0] ** 2.4
                 else:
-                    distance = cp.linalg.norm(coordinates[i, 1:] - coordinates[j, 1:])
+                    distance = np.linalg.norm(coordinates[i, 1:] - coordinates[j, 1:])
                     coulomb_matrix[i, j] = (
                         coordinates[i, 0] * coordinates[j, 0] / distance
                     )
                     coulomb_matrix[j, i] = coulomb_matrix[i, j]
-        norm = cp.linalg.norm(coulomb_matrix, axis=1)
-        sort_indices = cp.argsort(norm)[::-1]
+        norm = np.linalg.norm(coulomb_matrix, axis=1)
+        sort_indices = np.argsort(norm)[::-1]
         sorted_matrix = coulomb_matrix[sort_indices]
         sorted_matrix = sorted_matrix[:, sort_indices]
 
-        upper_triangular = cp.triu(sorted_matrix)
-
-        # Convert the cupy array to numpy array
-        upper_triangular_np = cp.asnumpy(upper_triangular)
-
         # Save the upper triangular matrix to a file
-        np.savetxt(
-            dpath.joinpath(xyz_file.stem + ".txt"),
-            upper_triangular_np,
-            delimiter=",",
-        )
+        if format == ".npy":
+            np.save(
+                dpath.joinpath(xyz_file.stem + format),
+                sorted_matrix,
+            )
+        elif format == ".txt":
+            np.savetxt(
+                dpath.joinpath(xyz_file.stem + format),
+                sorted_matrix,
+                delimiter=",",
+            )
+        else:
+            raise Exception("Unknown format\n")
 
         return sorted_matrix
 
@@ -1211,9 +1240,20 @@ class CoulombUtils:
     def restore_symmetric_matrix(matrix: np.array):
 
         # Reconstruct the symmetric matrix
-        symmetric_matrix = matrix - cp.transpose(matrix)
+        symmetric_matrix = matrix - np.transpose(matrix)
 
         return symmetric_matrix
+
+    @staticmethod
+    def find_maximum_shape(folder: Path, format: str = ".npy"):
+        max_shape = (0, 0)
+        for file in tqdm(folder.glob(f"*{format}")):
+            matrix = np.load(file)
+            shape = matrix.shape
+            if shape[0] > max_shape[0] and shape[1] > max_shape[1]:
+                max_shape = shape
+        np.savetxt(str(folder.joinpath("max_shape.txt")), max_shape)
+        return max_shape
 
 
 class OxygenUtils:

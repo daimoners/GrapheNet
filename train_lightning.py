@@ -33,6 +33,26 @@ def get_progressbar():
     return progress_bar
 
 
+def write_results_yaml(cfg: dict, data: dict = None):
+    if data is None:
+        train_data = {
+            "target": cfg.target,
+            "num_epochs": cfg.train.num_epochs,
+            "learning_rate": cfg.train.base_lr,
+            "batch_size": cfg.train.batch_size,
+            "dataset": cfg.train.spath,
+        }
+        with open(
+            str(Path(cfg.train.dpath).joinpath(f"{cfg.target}_train_results.yaml")), "w"
+        ) as outfile:
+            yaml.dump(train_data, outfile)
+    else:
+        with open(
+            str(Path(cfg.train.dpath).joinpath(f"{cfg.target}_train_results.yaml")), "a"
+        ) as outfile:
+            yaml.dump(data, outfile)
+
+
 @hydra.main(version_base="1.2", config_path="config", config_name="train_predict")
 def main(cfg):
 
@@ -79,6 +99,8 @@ def main(cfg):
             ],
         )
 
+    write_results_yaml(cfg)
+
     start = time.time()
     trainer.fit(model, dataloaders)
     end = time.time()
@@ -87,18 +109,7 @@ def main(cfg):
         f"Completed training:\n TARGET = {cfg.target}\n DATASET = {cfg.train.spath}\n NUM EPOCHS = {cfg.train.num_epochs}\n TRAINING TIME = {(end-start)/60:.3f} minutes"
     )
 
-    train_data = {
-        "target": cfg.target,
-        "num_epochs": cfg.train.num_epochs,
-        "learning_rate": cfg.train.base_lr,
-        "batch_size": cfg.train.batch_size,
-        "dataset": cfg.train.spath,
-        "training_time": float((end - start) / 60),
-    }
-    with open(
-        str(Path(cfg.train.dpath).joinpath(f"{cfg.target}_train_results.yaml")), "w"
-    ) as outfile:
-        yaml.dump(train_data, outfile)
+    write_results_yaml(cfg, data={"training_time": float((end - start) / 60)})
 
 
 if __name__ == "__main__":
