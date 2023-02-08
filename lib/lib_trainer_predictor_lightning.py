@@ -8,6 +8,8 @@ try:
     import pandas as pd
     from pathlib import Path
     import pytorch_lightning as pl
+    from pytorch_lightning.callbacks import RichProgressBar
+    from pytorch_lightning.callbacks.progress.rich_progress import RichProgressBarTheme
     import numpy as np
     from lib.lib_networks import (
         InceptionResNet,
@@ -241,6 +243,23 @@ class MyRegressor(pl.LightningModule):
                 "hp/batch_size": float(self.batch_size),
             }
         )
+
+    @staticmethod
+    def get_progressbar():
+        progress_bar = RichProgressBar(
+            theme=RichProgressBarTheme(
+                description="#e809a1",
+                progress_bar="#6206E0",
+                progress_bar_finished="green1",
+                progress_bar_pulse="#6206E0",
+                batch_progress="#e809a1",
+                time="#e8c309",
+                processing_speed="#e8c309",
+                metrics="white",
+            )
+        )
+
+        return progress_bar
 
 
 class MyDataloader(pl.LightningDataModule):

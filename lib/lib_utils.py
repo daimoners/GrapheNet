@@ -725,7 +725,7 @@ class Utils:
         dataset_path: Path,
         xyz_path: Path,
         format: str = ".png",
-        info_max_atoms: bool = False,
+        info_max_atoms: bool = True,
     ):
         """Generate the number and type of atoms in a .txt file for each .xyz file
 

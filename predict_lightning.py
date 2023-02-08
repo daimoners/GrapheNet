@@ -13,7 +13,7 @@ except Exception as e:
     print("Some module are missing {}".format(e))
 
 
-def get_model_names(checkpoints_path: Path):
+def get_checkpoint_name(checkpoints_path: Path):
 
     best_loss = [
         model
@@ -29,7 +29,7 @@ def main(cfg):
 
     seed_everything(42, workers=True)
 
-    checkpoints = get_model_names(Path(cfg.train.dpath))
+    checkpoints = get_checkpoint_name(Path(cfg.train.dpath))
 
     model = MyRegressor(cfg)
 
@@ -39,6 +39,7 @@ def main(cfg):
         deterministic=True,
         accelerator="gpu",
         devices=1,
+        callbacks=[model.get_progressbar()],
     )
 
     trainer.test(

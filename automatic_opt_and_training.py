@@ -20,11 +20,11 @@ def main(cfg):
             new_value=target,
         )
 
-        print(f"Finding HP for target: {target}")
-        process = subprocess.Popen(
-            ["python", str(Path().resolve().joinpath("hp_finder.py"))]
-        )
-        process.wait()
+        # print(f"Finding HP for target: {target}")
+        # process = subprocess.Popen(
+        #     ["python", str(Path().resolve().joinpath("hp_finder.py"))]
+        # )
+        # process.wait()
 
         print(f"Training for target: {target}")
         process = subprocess.Popen(

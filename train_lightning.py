@@ -6,10 +6,11 @@ try:
     from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping
     from pathlib import Path
     import time
-    from pytorch_lightning.callbacks import RichProgressBar
-    from pytorch_lightning.callbacks.progress.rich_progress import RichProgressBarTheme
     from pytorch_lightning import Trainer, seed_everything
     import yaml
+    from torchsummary import summary
+    import sys
+    import io
 
 
 except Exception as e:
@@ -17,23 +18,8 @@ except Exception as e:
     print("Some module are missing {}".format(e))
 
 
-def get_progressbar():
-    progress_bar = RichProgressBar(
-        theme=RichProgressBarTheme(
-            description="green_yellow",
-            progress_bar="green1",
-            progress_bar_finished="green1",
-            progress_bar_pulse="#6206E0",
-            batch_progress="green_yellow",
-            time="grey82",
-            processing_speed="grey82",
-            metrics="grey82",
-        )
-    )
-    return progress_bar
-
-
 def write_results_yaml(cfg: dict, data: dict = None):
+    Path(cfg.train.dpath).mkdir(exist_ok=True, parents=True)
     if data is None:
         train_data = {
             "target": cfg.target,
@@ -51,6 +37,31 @@ def write_results_yaml(cfg: dict, data: dict = None):
             str(Path(cfg.train.dpath).joinpath(f"{cfg.target}_train_results.yaml")), "a"
         ) as outfile:
             yaml.dump(data, outfile)
+
+
+def save_model_summary(cfg: dict, model: MyRegressor):
+    captured = io.StringIO()
+    sys.stdout = captured
+    summary(
+        model.net.cuda(),
+        (cfg.atom_types, cfg.resolution, cfg.resolution),
+        batch_size=cfg.train.batch_size,
+        device="cuda",
+    )
+    sys.stdout = sys.__stdout__
+
+    with open(str(Path(cfg.train.dpath).joinpath("model_summary.txt")), "w") as f:
+        # write the summary to the file
+        f.write(captured.getvalue())
+
+
+def get_model_name(model: MyRegressor):
+    raw_name = str(type(model.net))
+    chars_to_remove = "<>'"
+    translate_table = str.maketrans("", "", chars_to_remove)
+    name = raw_name.translate(translate_table)
+
+    return name.split(".")[-1]
 
 
 @hydra.main(version_base="1.2", config_path="config", config_name="train_predict")
@@ -82,7 +93,7 @@ def main(cfg):
             max_epochs=cfg.train.num_epochs,
             callbacks=[
                 checkpoint_callback,
-                get_progressbar(),
+                model.get_progressbar(),
                 early_stopping,
             ],
         )
@@ -94,12 +105,14 @@ def main(cfg):
             max_epochs=cfg.train.num_epochs,
             callbacks=[
                 checkpoint_callback,
-                get_progressbar(),
+                model.get_progressbar(),
                 early_stopping,
             ],
         )
 
     write_results_yaml(cfg)
+    write_results_yaml(cfg, data={"model_name": get_model_name(model)})
+    save_model_summary(cfg, model)
 
     start = time.time()
     trainer.fit(model, dataloaders)

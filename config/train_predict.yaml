@@ -8,9 +8,9 @@ num_workers: 6
 package_path: /home/cnrismn/git_workspace/GrapheNet
 resolution: 160
 sample: None
-target: total_energy
+target: ionization_potential
 train:
-  base_lr: 0.001
+  base_lr: 0.05
   batch_size: 32
   dpath: ${train.spath}/models/${target}
   num_epochs: 150
