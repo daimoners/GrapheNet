@@ -39,7 +39,7 @@ def main(cfg):
         model = MyRegressor(cfg, config)
         if cfg.cluster:
             trainer = Trainer(
-                deterministic=True,
+                deterministic=cfg.deterministic,
                 max_epochs=num_epochs,
                 # If fractional GPUs passed in, convert to int.
                 accelerator="gpu",
@@ -59,7 +59,7 @@ def main(cfg):
             )
         else:
             trainer = Trainer(
-                deterministic=True,
+                deterministic=cfg.deterministic,
                 max_epochs=num_epochs,
                 # If fractional GPUs passed in, convert to int.
                 accelerator="gpu",

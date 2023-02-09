@@ -36,7 +36,7 @@ def main(cfg):
     dataloaders = MyDataloader(cfg)
 
     trainer = Trainer(
-        deterministic=True,
+        deterministic=cfg.deterministic,
         accelerator="gpu",
         devices=1,
         callbacks=[model.get_progressbar()],

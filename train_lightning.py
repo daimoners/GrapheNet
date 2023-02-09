@@ -85,7 +85,7 @@ def main(cfg):
 
     if cfg.cluster:
         trainer = Trainer(
-            deterministic=True,
+            deterministic=cfg.deterministic,
             accelerator="gpu",
             num_nodes=1,
             devices=2,
@@ -99,7 +99,7 @@ def main(cfg):
         )
     else:
         trainer = Trainer(
-            deterministic=True,
+            deterministic=cfg.deterministic,
             accelerator="gpu",
             devices=1,
             max_epochs=cfg.train.num_epochs,

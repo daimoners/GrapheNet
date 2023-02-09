@@ -11,6 +11,8 @@ try:
     import cv2
     import matplotlib.pyplot as plt
     import shutil
+    import pandas as pd
+    from tqdm import tqdm
 
 except Exception as e:
 
@@ -93,25 +95,25 @@ def inception_plot_filters(model_weights, save_path: Path):
 
     print("Plotting filters...")
     layers = {
-        0: "conv1_64",
-        1: "conv3_64",
-        2: "conv5_64",
-        3: "conv1_128",
-        4: "conv3_128",
-        5: "conv5_128",
-        6: "conv1_256",
-        7: "conv3_256",
-        8: "conv5_256",
+        0: "conv1_32",
+        1: "conv3_32",
+        2: "conv5_32",
+        3: "conv1_64",
+        4: "conv3_64",
+        5: "conv5_64",
+        6: "conv1_128",
+        7: "conv3_128",
+        8: "conv5_128",
     }
     for k in range(0, len(model_weights)):
         plt.figure(figsize=(15, 15))
         for i, filter in enumerate(model_weights[k]):
             if k in [0, 1, 2]:
-                plt.subplot(8, 8, i + 1)
+                plt.subplot(6, 6, i + 1)
             elif k in [3, 4, 5]:
-                plt.subplot(12, 12, i + 1)
+                plt.subplot(8, 8, i + 1)
             elif k in [6, 7, 8]:
-                plt.subplot(16, 16, i + 1)
+                plt.subplot(12, 12, i + 1)
             plt.imshow(filter[0, :, :].detach().cpu(), cmap="gray")
             plt.axis("off")
             plt.savefig(str(filters_path.joinpath(f"filter_{layers[k]}.png")))
@@ -179,19 +181,19 @@ def inception_plot_feature_maps(
     feature_maps_path.mkdir(parents=True, exist_ok=True)
 
     layers = {
-        0: "conv1_64",
-        1: "conv3_64",
-        2: "conv5_64",
-        3: "conv1_128",
-        4: "conv3_128",
-        5: "conv5_128",
-        6: "conv1_256",
-        7: "conv3_256",
-        8: "conv5_256",
+        0: "conv1_32",
+        1: "conv3_32",
+        2: "conv5_32",
+        3: "conv1_64",
+        4: "conv3_64",
+        5: "conv5_64",
+        6: "conv1_128",
+        7: "conv3_128",
+        8: "conv5_128",
     }
     # visualize "num_filters" features from each layer
     # (although there are more feature maps in the upper layers)
-    for num_layer in range(len(outputs)):
+    for num_layer in tqdm(range(len(outputs))):
         plt.figure(figsize=(5, 5))
         layer_viz = outputs[num_layer][0, :, :, :]
         layer_viz = layer_viz.data
@@ -211,10 +213,18 @@ def inception_plot_feature_maps(
         plt.close()
 
 
-def load_image(img_path: Path, resolution: int):
+def load_image(img_path: Path, resolution: int, enlargement_method: str = "padding"):
 
     image = cv2.imread(str(img_path), -1)
-    image = Utils.padding_image(image, size=resolution)
+    if enlargement_method == "padding":
+        image = Utils.padding_image(image, size=resolution)
+    elif enlargement_method == "resize":
+        image = cv2.resize(
+            image, (resolution, resolution), interpolation=cv2.INTER_CUBIC
+        )
+    else:
+        raise Exception("Wrong enlargement method!")
+
     image = np.asarray(image, float) / 255.0
     if len(image.shape) == 2:
         image = torch.unsqueeze(
@@ -233,7 +243,7 @@ def load_image(img_path: Path, resolution: int):
     return image
 
 
-def make_prediction(model, image, sample_path: Path, target: str = "total_energy"):
+def make_prediction(model, image, sample_path: Path, target: str):
     prediction = model(image)
     prediction = torch.squeeze(prediction).detach().cpu().numpy()
 
@@ -250,6 +260,17 @@ def make_prediction(model, image, sample_path: Path, target: str = "total_energy
             )
 
     return prediction
+
+
+def get_target_value(sample_name: str, target: str, csv_path: Path):
+    df = pd.read_csv(csv_path)
+
+    df_filtered = df.loc[df["file_name"] == sample_name]
+
+    # Extract the value of column 'A' for the filtered rows
+    value = df_filtered[target].iloc[0]
+
+    return value
 
 
 def get_weights_and_layers(model):
@@ -305,14 +326,19 @@ def main(cfg):
 
     model_weights, conv_layers = new_get_weights_and_layers(model)
 
-    image = load_image(Path(cfg.sample), cfg.resolution)
+    image = load_image(Path(cfg.sample), cfg.resolution, cfg.enlargement_method)
 
     prediction = make_prediction(model, image, Path(cfg.sample), target=cfg.target)
     print(f"Predicted target: {prediction:.4f}")
+    target_value = get_target_value(
+        Path(cfg.sample).stem, cfg.target, Path(cfg.train.spath).joinpath("dataset.csv")
+    )
+    print(f"Real target: {target_value:.4f}")
+    print(f"MAE: {abs((prediction-target_value)/target_value):.6f}%")
 
     shutil.copy(cfg.sample, str(save_path))
     inception_plot_feature_maps(conv_layers, image, save_path, num_filters=-1)
-    inception_plot_filters(model_weights, save_path)
+    # inception_plot_filters(model_weights, save_path)
 
 
 if __name__ == "__main__":
