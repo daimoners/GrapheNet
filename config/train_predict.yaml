@@ -9,9 +9,9 @@ num_workers: 6
 package_path: /home/cnrismn/git_workspace/GrapheNet
 resolution: 160
 sample: /home/cnrismn/git_workspace/GrapheNet/dftb/neutral_1021/neutral_1021.png
-target: ionization_potential
+target: total_energy
 train:
-  base_lr: 0.007977032186834113
+  base_lr: 0.017499201033278063
   batch_size: 32
   dpath: ${train.spath}/models/${target}
   num_epochs: 150

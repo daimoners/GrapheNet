@@ -350,18 +350,21 @@ class MyDataloader(pl.LightningDataModule):
                 train_dataset[self.target],
                 resolution=self.resolution,
                 enlargement_method=self.enlargement_method,
+                phase="train",
             )
             self.val_data = MyDatasetPng(
                 val_paths,
                 val_dataset[self.target],
                 resolution=self.resolution,
                 enlargement_method=self.enlargement_method,
+                phase="val",
             )
             self.test_data = MyDatasetPng(
                 test_paths,
                 test_dataset[self.target],
                 resolution=self.resolution,
                 enlargement_method=self.enlargement_method,
+                phase="test",
             )
 
     def train_dataloader(self):

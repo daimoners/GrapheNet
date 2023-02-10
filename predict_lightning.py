@@ -7,6 +7,7 @@ try:
     import numpy as np
     from lib.lib_utils import Utils
     import yaml
+    from telegram_notificatioin_system import send_telegram_message
 
 except Exception as e:
 
@@ -72,6 +73,10 @@ def main(cfg):
         y_hat=model.plot_y_hat,
         dpath=Path(cfg.train.dpath).joinpath(f"{cfg.target}_fit.png"),
         target=cfg.target,
+    )
+
+    send_telegram_message(
+        f"Prediction on target '{cfg.target}' completed:\n Maximum % error = {np.max(model.errors):.5f}%\n Mean % error = {np.mean(model.errors):.5f}%\n STD % error = {np.std(model.errors):.5f}%"
     )
 
 

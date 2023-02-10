@@ -5,7 +5,14 @@ path_csv: "${path_xyz}/dataset.csv"
 spath: "${data_path}/png_files"
 dpath: "${data_path}/training_dataset/"
 plot_distributions: True
-features: ["ionization_potential", "electron_affinity", "electronegativity", "Fermi_energy", "total_energy"]
+features:
+  [
+    "ionization_potential",
+    "electron_affinity",
+    "electronegativity",
+    "Fermi_energy",
+    "total_energy",
+  ]
 target: None
 
 randomly:

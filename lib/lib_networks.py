@@ -5,6 +5,14 @@ try:
     import cv2
     import numpy as np
     from lib.lib_utils import Utils
+    from torchvision.transforms import (
+        RandomHorizontalFlip,
+        RandomVerticalFlip,
+        RandomRotation,
+        Compose,
+        ToPILImage,
+    )
+    from PIL import Image
 
 except Exception as e:
 
@@ -68,6 +76,16 @@ class InceptionResNet(nn.Module):
 
         self.flatten = nn.Flatten()
 
+        self.downsample_0 = nn.Sequential(
+            nn.Conv2d(
+                input_channels,
+                (filters[0] + filters[1]),
+                kernel_size=1,
+                bias=False,
+            ),
+            nn.BatchNorm2d(filters[0] + filters[1]),
+        )
+
         self.downsample_1 = nn.Sequential(
             nn.Conv2d(
                 (filters[0] + filters[1]),
@@ -100,8 +118,10 @@ class InceptionResNet(nn.Module):
 
     def forward(self, x):
 
+        residual = x
+
         x = self.inception1(x)
-        x = self.relu(self.batchnorm1(x))
+        x = self.relu(self.batchnorm1(x)) + self.downsample_0(residual)
         x = self.max_pool(x)
 
         residual = x
@@ -551,11 +571,21 @@ class MyDatasetPng:
         targets,
         resolution=160,
         enlargement_method="padding",
+        phase="train",
     ):
         self.paths = paths
         self.targets = targets
         self.resolution = resolution
         self.enlargement_method = enlargement_method
+        self.phase = phase
+        self.data_augmentation = Compose(
+            [
+                # ToPILImage(),
+                RandomHorizontalFlip(p=0.5),
+                RandomVerticalFlip(p=0.5),
+                RandomRotation(15),
+            ]
+        )
 
     def __len__(self):
         return len(self.paths)
@@ -568,6 +598,13 @@ class MyDatasetPng:
             img = cv2.resize(
                 img, (self.resolution, self.resolution), interpolation=cv2.INTER_CUBIC
             )
+        if self.phase == "train" or self.phase == "val":
+            img = (
+                Image.fromarray(img, "L")  # TODO ricontrollare tutta questa parte
+                if len(img.shape) == 2  #! meglio fare tutto direttamente con PIL
+                else Image.fromarray(img, "RGB")
+            )
+            img = self.data_augmentation(img)
         img = np.asarray(img, float) / 255.0
 
         target = np.array(float(self.targets[i]))
