@@ -24,6 +24,7 @@ def main(cfg):
         n_items=7000,
         targets=cfg.features,
         oxygen_distribution_threshold=cfg.randomly.oxygen_outliers_th,
+        min_num_atoms=cfg.randomly.min_num_atoms,
     )
 
     dataset = DatasetGenerator(cfg)

@@ -1,5 +1,5 @@
 package_path: "/home/cnrismn/git_workspace/GrapheNet"
-data_path: "${package_path}/data_GO"
+data_path: "${package_path}/data_GO_num_atoms_650_2000"
 path_xyz: "${data_path}/xyz_files/"
 path_csv: "${path_xyz}/dataset.csv"
 spath: "${data_path}/png_files"
@@ -20,7 +20,8 @@ randomly:
   val_split: 0.15
   test_split: 0.15
   shuffle: True
-  oxygen_outliers_th: 0.2
+  oxygen_outliers_th: 0.0
+  min_num_atoms: [650, 2000]
 
 from_csv:
   flag: False

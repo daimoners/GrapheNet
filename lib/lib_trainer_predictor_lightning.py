@@ -19,6 +19,7 @@ try:
         MySimpleResNet,
         DeepCNN,
         MyDatasetCoulombCluster,
+        NewMyDatasetPng,
     )
 
 except Exception as e:
@@ -69,6 +70,21 @@ class MyRegressor(pl.LightningModule):
                 )
             )
             self.min = np.abs(minimum)
+        elif self.normalize == "boxcox":
+            _lambda = np.loadtxt(
+                str(
+                    Path(cfg.train.spath).joinpath("train", f"lambda_{self.target}.txt")
+                )
+            )
+            minimum = np.loadtxt(
+                str(
+                    Path(cfg.train.spath).joinpath(
+                        "train", f"minimum_{self.target}.txt"
+                    )
+                )
+            )
+            self.min = np.abs(minimum) + 1
+            self._lambda = torch.tensor(_lambda)
 
         self.min_val_loss = float("inf")
 
@@ -144,6 +160,12 @@ class MyRegressor(pl.LightningModule):
             target = (target - self.min) / (self.max - self.min)
         elif self.normalize == "log":
             target = torch.log(target + (self.min + 1))
+        elif self.normalize == "boxcox":
+            target = target + self.min
+            target = (target**self._lambda - 1) / self._lambda
+            # target = (
+            #     torch.pow((target + (self.min + 1)), self._lambda) - 1
+            # ) / self._lambda
 
         return (
             torch.sqrt(l2(output, target))
@@ -173,6 +195,9 @@ class MyRegressor(pl.LightningModule):
             output = output * (self.max - self.min) + self.min
         elif self.normalize == "log":
             output = torch.exp(output) - (self.min + 1)
+        elif self.normalize == "boxcox":
+            output = (output * self._lambda + 1) ** (1 / self._lambda)
+            output = output - self.min
 
         error = torch.abs(output - target) / torch.abs(target) * 100.0
 
@@ -250,12 +275,12 @@ class MyRegressor(pl.LightningModule):
             theme=RichProgressBarTheme(
                 description="#e809a1",
                 progress_bar="#6206E0",
-                progress_bar_finished="green1",
+                progress_bar_finished="#00c900",
                 progress_bar_pulse="#6206E0",
                 batch_progress="#e809a1",
                 time="#e8c309",
                 processing_speed="#e8c309",
-                metrics="white",
+                metrics="#dbd7d7",
             )
         )
 
@@ -280,33 +305,23 @@ class MyDataloader(pl.LightningDataModule):
         self.coulomb = cfg.coulomb
 
     def setup(self, stage=None):
-        print(stage)
 
         train_dataset = pd.read_csv(Path(self.spath).joinpath("train", "train.csv"))
         val_dataset = pd.read_csv(Path(self.spath).joinpath("val", "val.csv"))
         test_dataset = pd.read_csv(Path(self.spath).joinpath("test", "test.csv"))
 
         # collect the path of the .npy files for each set in order to generate the DataLoader objects
-        train_paths = []
-        val_paths = []
-        test_paths = []
-
-        for i in range(len(train_dataset["file_name"])):
-            train_paths.append(
-                Path(self.spath).joinpath(
-                    "train", train_dataset["file_name"][i] + ".png"
-                )
-            )
-
-        for i in range(len(val_dataset["file_name"])):
-            val_paths.append(
-                Path(self.spath).joinpath("val", val_dataset["file_name"][i] + ".png")
-            )
-
-        for i in range(len(test_dataset["file_name"])):
-            test_paths.append(
-                Path(self.spath).joinpath("test", test_dataset["file_name"][i] + ".png")
-            )
+        train_paths = [
+            f
+            for f in Path(self.spath).joinpath("train").iterdir()
+            if f.suffix == ".png"
+        ]
+        val_paths = [
+            f for f in Path(self.spath).joinpath("val").iterdir() if f.suffix == ".png"
+        ]
+        test_paths = [
+            f for f in Path(self.spath).joinpath("test").iterdir() if f.suffix == ".png"
+        ]
 
         if self.cluster:
             if self.coulomb:
@@ -345,23 +360,26 @@ class MyDataloader(pl.LightningDataModule):
                     enlargement_method=self.enlargement_method,
                 )
         else:
-            self.train_data = MyDatasetPng(
+            self.train_data = NewMyDatasetPng(
                 train_paths,
-                train_dataset[self.target],
+                train_dataset,
+                self.target,
                 resolution=self.resolution,
                 enlargement_method=self.enlargement_method,
                 phase="train",
             )
-            self.val_data = MyDatasetPng(
+            self.val_data = NewMyDatasetPng(
                 val_paths,
-                val_dataset[self.target],
+                val_dataset,
+                self.target,
                 resolution=self.resolution,
                 enlargement_method=self.enlargement_method,
                 phase="val",
             )
-            self.test_data = MyDatasetPng(
+            self.test_data = NewMyDatasetPng(
                 test_paths,
-                test_dataset[self.target],
+                test_dataset,
+                self.target,
                 resolution=self.resolution,
                 enlargement_method=self.enlargement_method,
                 phase="test",

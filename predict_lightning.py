@@ -7,7 +7,7 @@ try:
     import numpy as np
     from lib.lib_utils import Utils
     import yaml
-    from telegram_notificatioin_system import send_telegram_message
+    from telegram_bot import send_message
 
 except Exception as e:
 
@@ -75,9 +75,8 @@ def main(cfg):
         target=cfg.target,
     )
 
-    send_telegram_message(
-        f"Prediction on target '{cfg.target}' completed:\n Maximum % error = {np.max(model.errors):.5f}%\n Mean % error = {np.mean(model.errors):.5f}%\n STD % error = {np.std(model.errors):.5f}%"
-    )
+    message = f"Prediction on target `{cfg.target}` completed ✅:\n🔺 Maximum % error \\= `{np.max(model.errors):.5f}%`\n🔸 Mean % error \\= `{np.mean(model.errors):.5f}%`\n🔹 STD % error \\= `{np.std(model.errors):.5f}%`"
+    send_message(message, parse_mode="MarkdownV2", disable_notification=True)
 
 
 if __name__ == "__main__":

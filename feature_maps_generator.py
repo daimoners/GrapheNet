@@ -334,7 +334,7 @@ def main(cfg):
         Path(cfg.sample).stem, cfg.target, Path(cfg.train.spath).joinpath("dataset.csv")
     )
     print(f"Real target: {target_value:.4f}")
-    print(f"MAE: {abs((prediction-target_value)/target_value):.6f}%")
+    print(f"MAE: {abs((prediction-target_value)/target_value)*100.0:.6f}%")
 
     shutil.copy(cfg.sample, str(save_path))
     inception_plot_feature_maps(conv_layers, image, save_path, num_filters=-1)

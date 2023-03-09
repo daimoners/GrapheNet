@@ -15,9 +15,10 @@ try:
     from pathlib import Path
     import matplotlib.pyplot as plt
     import math
-    from scipy.stats import pearsonr, spearmanr, kendalltau
+    from scipy.stats import pearsonr, spearmanr, kendalltau, boxcox
     import yaml
     from sklearn.model_selection import StratifiedShuffleSplit, train_test_split
+    from scipy.spatial.distance import pdist
 
 except Exception as e:
 
@@ -96,20 +97,56 @@ class Utils:
 
         X, Y, Z, atoms = Utils.read_from_xyz_file(spath)
 
-        C = np.zeros((resolution, resolution))
-        O = np.zeros((resolution, resolution))
-        H = np.zeros((resolution, resolution))
-
         if z_relative:
             z_max = np.max(Z)
             z_min = np.min(Z)
+
+            path = spath.parent.joinpath("max_min_coordinates.txt")
+
+            x = np.loadtxt(str(path))
+
+            x_max = x[0][0]
+            x_min = x[1][0]
+
+            y_max = x[0][1]
+            y_min = x[1][1]
+
+            resolution = round(
+                4
+                * (
+                    5
+                    + np.max(
+                        [np.abs(x_max), np.abs(x_min), np.abs(y_max), np.abs(y_min)]
+                    )
+                )
+            )
         else:
             path = spath.parent.joinpath("max_min_coordinates.txt")
 
             x = np.loadtxt(str(path))
 
+            x_max = x[0][0]
+            x_min = x[1][0]
+
+            y_max = x[0][1]
+            y_min = x[1][1]
+
             z_max = x[0][2]
             z_min = x[1][2]
+
+            resolution = round(
+                4
+                * (
+                    5
+                    + np.max(
+                        [np.abs(x_max), np.abs(x_min), np.abs(y_max), np.abs(y_min)]
+                    )
+                )
+            )
+
+        C = np.zeros((resolution, resolution))
+        O = np.zeros((resolution, resolution))
+        H = np.zeros((resolution, resolution))
 
         z_norm = lambda x: (x - z_min) / (z_max - z_min)
 
@@ -117,20 +154,20 @@ class Utils:
 
         for i in range(len(X)):
             if atoms[i] == "C":
-                x_coord = int(round(X[i] * resolution / 160) + resolution / 2)
-                y_coord = int(round(Y[i] * resolution / 160) + resolution / 2)
+                x_coord = int(round(X[i] * 2) + resolution / 2)
+                y_coord = int(round(Y[i] * 2) + resolution / 2)
                 if C[y_coord, x_coord] < z_norm(Z[i]):
                     C[y_coord, x_coord] = z_norm(Z[i])
             elif atoms[i] == "O":
                 C_only = False
-                x_coord = int(round(X[i] * resolution / 160) + resolution / 2)
-                y_coord = int(round(Y[i] * resolution / 160) + resolution / 2)
+                x_coord = int(round(X[i] * 2) + resolution / 2)
+                y_coord = int(round(Y[i] * 2) + resolution / 2)
                 if O[y_coord, x_coord] < z_norm(Z[i]):
                     O[y_coord, x_coord] = z_norm(Z[i])
             elif atoms[i] == "H":
                 C_only = False
-                x_coord = int(round(X[i] * resolution / 160) + resolution / 2)
-                y_coord = int(round(Y[i] * resolution / 160) + resolution / 2)
+                x_coord = int(round(X[i] * 2) + resolution / 2)
+                y_coord = int(round(Y[i] * 2) + resolution / 2)
                 if H[y_coord, x_coord] < z_norm(Z[i]):
                     H[y_coord, x_coord] = z_norm(Z[i])
 
@@ -161,6 +198,9 @@ class Utils:
 
     @staticmethod
     def dataset_max_and_min(spath: Path, dpath: Path = None) -> list:
+        """
+        This static method returns a list of the maximum and minimum values for each coordinate given a folder of .xyz files. It takes two parameters, spath (Path) and dpath (Path), with dpath being optional. It creates two lists, MAX and MIN, which are initialized to [0, 0, 0]. It then iterates through the files in the spath directory and checks if each file is an .xyz file. If it is, it calls the find_max_and_min() method from Utils to get the max and min values for that file. It then compares these values to MAX and MIN respectively to update them if necessary. Finally, if dpath is not None, it saves the MAX and MIN lists as a text file in the dpath directory. Otherwise it just prints out MAX and MIN. The method returns both MAX and MIN as a list.
+        """
         """Return a list of Max and Min for each coordinate, given a folder of .xyz files"""
 
         MAX = [0, 0, 0]
@@ -721,6 +761,28 @@ class Utils:
         print(f"Minimum: {np.min(target_array)}")
 
     @staticmethod
+    def compute_lambda_boxcox(csv_path: Path, target: str):
+
+        df = pd.read_csv(csv_path)
+
+        target_values = df[target].to_numpy()
+
+        target_values = target_values + np.abs(np.min(target_values)) + 1
+
+        # Apply Box-Cox transformation to the data
+        transformed_data, lambda_value = boxcox(target_values)
+
+        np.savetxt(
+            str(csv_path.parent.joinpath(f"lambda_{target}.txt")),
+            [lambda_value],
+        )
+
+        # Print the lambda value
+        print("Lambda value:", lambda_value)
+        # Print the first 5 values of the transformed data
+        print("Transformed data:", transformed_data[:5])
+
+    @staticmethod
     def generate_num_atoms(
         dataset_path: Path,
         xyz_path: Path,
@@ -804,14 +866,14 @@ class Utils:
         print("Dropping outliers from the dataset...\n")
 
         el_aff_down = df.index[df["electron_affinity"] <= -7].tolist()
-        el_aff_up = df.index[df["electron_affinity"] >= -3.5].tolist()
+        el_aff_up = df.index[df["electron_affinity"] >= -4].tolist()
         el_aff = [*el_aff_down, *el_aff_up]
 
-        elneg_down = df.index[df["electronegativity"] <= -6.5].tolist()
-        elneg_up = df.index[df["electronegativity"] >= -3.5].tolist()
+        elneg_down = df.index[df["electronegativity"] <= -6.2].tolist()
+        elneg_up = df.index[df["electronegativity"] >= -4].tolist()
         elneg = [*elneg_down, *elneg_up]
 
-        i_pot_down = df.index[df["ionization_potential"] <= -6.2].tolist()
+        i_pot_down = df.index[df["ionization_potential"] <= -6.0].tolist()
         i_pot_up = df.index[df["ionization_potential"] >= -3.5].tolist()
         i_pot = [*i_pot_down, *i_pot_up]
 
@@ -907,6 +969,8 @@ class Utils:
             "Fermi_energy",
         ],
         oxygen_distribution_threshold: float | None = None,
+        drop_custom: bool = False,
+        min_num_atoms: int | list = None,
     ):
 
         targets = ["file_name", *targets]
@@ -918,22 +982,34 @@ class Utils:
             or oxygen_distribution_threshold == 0.0
         ):
 
-            samples = [x for x in xyz_path.iterdir() if x.suffix == ".xyz"]
-
             df = pd.read_csv(xyz_path.joinpath("dataset.csv"))
 
             df = Utils.drop_nan_and_zeros(df)
 
-            df = Utils.drop_custom(df)
+            if drop_custom:
+                df = Utils.drop_custom(df)
+
+            if min_num_atoms is not None or min_num_atoms != 0:
+                df = Utils.drop_min_num_atoms(df, min_num_atoms)
+
+            names = df["file_name"].tolist()
 
             items = []
 
-            for file in tqdm(random.sample(samples, k=n_items)):
-                shutil.copy(
-                    file,
-                    dpath.joinpath(file.name),
-                )
-                items.append(file.stem)
+            if n_items == 0:
+                for file in tqdm(names):
+                    shutil.copy(
+                        xyz_path.joinpath(file + ".xyz"),
+                        dpath.joinpath(file + ".xyz"),
+                    )
+                    items.append(file)
+            else:
+                for file in tqdm(random.sample(names, k=n_items)):
+                    shutil.copy(
+                        xyz_path.joinpath(file + ".xyz"),
+                        dpath.joinpath(file + ".xyz"),
+                    )
+                    items.append(file)
 
             df = df[df["file_name"].isin(items)]
 
@@ -949,6 +1025,12 @@ class Utils:
                 threshold=oxygen_distribution_threshold,
                 targets=targets,
             )
+
+            if drop_custom:
+                df = Utils.drop_custom(df)
+
+            if min_num_atoms is not None:
+                df = Utils.drop_min_num_atoms(df, min_num_atoms)
 
             df.to_csv(dpath.joinpath("dataset.csv"))
 
@@ -972,6 +1054,24 @@ class Utils:
         Utils.dataset_max_and_min(spath=dpath, dpath=dpath)
 
         print("Done")
+
+    @staticmethod
+    def drop_min_num_atoms(df: pd.DataFrame, min_num_atoms: int | list):
+
+        print("Dropping outliers from the dataset...\n")
+
+        if isinstance(min_num_atoms, int):
+            indices_to_drop = df.index[df["atom_number_total"] < min_num_atoms].tolist()
+        elif len(min_num_atoms) == 2:
+            indices_down = df.index[df["atom_number_total"] < min_num_atoms[0]].tolist()
+            indices_up = df.index[df["atom_number_total"] > min_num_atoms[1]].tolist()
+            indices_to_drop = [*indices_down, *indices_up]
+        else:
+            raise Exception(f"Wrong type for 'min_num_atoms': {type(min_num_atoms)}")
+
+        df = df.drop(indices_to_drop, axis=0)
+
+        return df
 
     @staticmethod
     def update_yaml(spath: Path, new_value: float | str, target_key="base_lr"):
@@ -1258,80 +1358,29 @@ class CoulombUtils:
 
 class OxygenUtils:
     @staticmethod
-    def get_oxygen_distribution_means(
-        csv_path: Path, xyz_path: Path, dpath: Path = None
-    ) -> np.array:
+    def compute_mean_oxygen_distance(file_path: Path):
+        # Load the file into numpy arrays
+        X, Y, Z, atoms = Utils.read_from_xyz_file(file_path)
 
-        MAX, MIN = OxygenUtils.find_max_min_distribution(csv_path, xyz_path)
+        # Identify oxygen atoms and extract their positions
+        oxygen_indices = [i for i, atom in enumerate(atoms) if atom == "O"]
+        oxygen_positions = np.column_stack(
+            (X[oxygen_indices], Y[oxygen_indices], Z[oxygen_indices])
+        )
 
-        df = pd.read_csv(str(csv_path))
-        names = df["file_name"].tolist()
+        # Compute pairwise distances between all oxygen atoms
+        distances = pdist(oxygen_positions)
 
-        distribution_means = []
-        distribution = []
-        d = []
+        # Compute the mean distance between all oxygen atoms
+        mean_oxygen_distance = np.mean(distances)
 
-        for f in tqdm(range(len(names))):
-
-            X, Y, Z, atoms = Utils.read_from_xyz_file(
-                xyz_path.joinpath(names[f] + ".xyz")
-            )
-
-            distribution.clear()
-
-            for i in range(len(X)):
-                if atoms[i] == "O":
-                    d.clear()
-                    for j in range(len(X)):
-                        if atoms[j] == "O" and i != j:
-                            P1 = [X[i], Y[i]]
-                            P2 = [X[j], Y[j]]
-                            d.append(math.dist(P1, P2))
-
-                    distribution.append((np.mean(d) - MIN) / (MAX - MIN))
-
-            distribution_means.append(np.mean(distribution))
-
-            if dpath is not None:
-                plt.hist(
-                    distribution,
-                    bins=[0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9],
-                )
-
-                # Add labels and title
-                plt.xlabel("Data")
-                plt.ylabel("Frequency")
-                plt.title("Histogram of Data")
-
-                # Show the plot
-                plt.savefig(dpath.joinpath("distributions", names[f] + ".png"))
-                plt.close()
-
-                hist_data = np.histogram(
-                    distribution,
-                    bins=[0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9],
-                )
-                np.savetxt(
-                    str(
-                        dpath.joinpath("distributions", f"{names[f]}_distribution.txt")
-                    ),
-                    hist_data[
-                        0
-                    ],  # TODO va normalizzata prima di salvarla, capire che normalizzazione devo fare
-                )
-
-        if dpath is not None:
-            np.savetxt(
-                str(dpath.joinpath("distribution_means.txt")),
-                np.array(distribution_means),
-            )
-
-        return distribution_means
+        return mean_oxygen_distance
 
     @staticmethod
-    def find_max_min_distribution(
+    def get_oxygen_distribution_means(
         csv_path: Path,
         xyz_path: Path,
+        dpath: Path = None,
         targets: list = [
             "electronegativity",
             "total_energy",
@@ -1339,8 +1388,10 @@ class OxygenUtils:
             "ionization_potential",
             "Fermi_energy",
         ],
-    ):
-        print("Finding MAX and MIN value of the oxygen distribution...\n")
+    ) -> np.array:
+
+        MAX, MIN = OxygenUtils.find_max_min_distribution(csv_path, xyz_path)
+
         df = pd.read_csv(str(csv_path))
         df = df.dropna(subset=targets)
 
@@ -1352,35 +1403,143 @@ class OxygenUtils:
 
         names = df["file_name"].tolist()
 
-        max_distribution = []
-        min_distribution = []
+        distribution_means = []
 
-        distribution = []
-        d = []
+        for name in tqdm(names):
 
-        for f in range(len(names)):
-
-            X, Y, Z, atoms = Utils.read_from_xyz_file(
-                xyz_path.joinpath(names[f] + ".xyz")
+            distribution_means.append(
+                OxygenUtils.compute_mean_oxygen_distance(
+                    xyz_path.joinpath(name + ".xyz")
+                )
             )
 
-            distribution.clear()
+        df["distribution_mean"] = distribution_means
+        df.to_csv(csv_path.with_stem("distribution_mean"))
 
-            for i in range(len(X)):
-                if atoms[i] == "O":
-                    d.clear()
-                    for j in range(len(X)):
-                        if atoms[j] == "O" and i != j:
-                            P1 = [X[i], Y[i]]
-                            P2 = [X[j], Y[j]]
-                            d.append(math.dist(P1, P2))
+    # @staticmethod
+    # def get_oxygen_distribution_means( #! DEPRECATED
+    #     csv_path: Path, xyz_path: Path, dpath: Path = None
+    # ) -> np.array:
 
-                    distribution.append(np.mean(d))
+    #     MAX, MIN = OxygenUtils.find_max_min_distribution(csv_path, xyz_path)
 
-            max_distribution.append(np.max(distribution))
-            min_distribution.append(np.min(distribution))
+    #     df = pd.read_csv(str(csv_path))
+    #     names = df["file_name"].tolist()
 
-        return np.max(max_distribution), np.min(min_distribution)
+    #     distribution_means = []
+    #     distribution = []
+    #     d = []
+
+    #     for f in tqdm(range(len(names))):
+
+    #         X, Y, Z, atoms = Utils.read_from_xyz_file(
+    #             xyz_path.joinpath(names[f] + ".xyz")
+    #         )
+
+    #         distribution.clear()
+
+    #         for i in range(len(X)):
+    #             if atoms[i] == "O":
+    #                 d.clear()
+    #                 for j in range(len(X)):
+    #                     if atoms[j] == "O" and i != j:
+    #                         P1 = [X[i], Y[i]]
+    #                         P2 = [X[j], Y[j]]
+    #                         d.append(math.dist(P1, P2))
+
+    #                 distribution.append((np.mean(d) - MIN) / (MAX - MIN))
+
+    #         distribution_means.append(np.mean(distribution))
+
+    #         if dpath is not None:
+    #             plt.hist(
+    #                 distribution,
+    #                 bins=[0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9],
+    #             )
+
+    #             # Add labels and title
+    #             plt.xlabel("Data")
+    #             plt.ylabel("Frequency")
+    #             plt.title("Histogram of Data")
+
+    #             # Show the plot
+    #             plt.savefig(dpath.joinpath("distributions", names[f] + ".png"))
+    #             plt.close()
+
+    #             hist_data = np.histogram(
+    #                 distribution,
+    #                 bins=[0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9],
+    #             )
+    #             np.savetxt(
+    #                 str(
+    #                     dpath.joinpath("distributions", f"{names[f]}_distribution.txt")
+    #                 ),
+    #                 hist_data[
+    #                     0
+    #                 ],  # TODO va normalizzata prima di salvarla, capire che normalizzazione devo fare
+    #             )
+
+    #     if dpath is not None:
+    #         np.savetxt(
+    #             str(dpath.joinpath("distribution_means.txt")),
+    #             np.array(distribution_means),
+    #         )
+
+    #     return distribution_means
+
+    # @staticmethod
+    # def find_max_min_distribution(
+    #     csv_path: Path,
+    #     xyz_path: Path,
+    #     targets: list = [
+    #         "electronegativity",
+    #         "total_energy",
+    #         "electron_affinity",
+    #         "ionization_potential",
+    #         "Fermi_energy",
+    #     ],
+    # ):
+    #     print("Finding MAX and MIN value of the oxygen distribution...\n")
+    #     df = pd.read_csv(str(csv_path))
+    #     df = df.dropna(subset=targets)
+
+    #     indices = []
+    #     for t in targets:
+    #         idx = df.index[df[t] == 0.0].tolist()
+    #         indices = [*indices, *idx]
+    #     df = df.drop(indices, axis=0)
+
+    #     names = df["file_name"].tolist()
+
+    #     max_distribution = []
+    #     min_distribution = []
+
+    #     distribution = []
+    #     d = []
+
+    #     for f in range(len(names)):
+
+    #         X, Y, Z, atoms = Utils.read_from_xyz_file(
+    #             xyz_path.joinpath(names[f] + ".xyz")
+    #         )
+
+    #         distribution.clear()
+
+    #         for i in range(len(X)):
+    #             if atoms[i] == "O":
+    #                 d.clear()
+    #                 for j in range(len(X)):
+    #                     if atoms[j] == "O" and i != j:
+    #                         P1 = [X[i], Y[i]]
+    #                         P2 = [X[j], Y[j]]
+    #                         d.append(math.dist(P1, P2))
+
+    #                 distribution.append(np.mean(d))
+
+    #         max_distribution.append(np.max(distribution))
+    #         min_distribution.append(np.min(distribution))
+
+    #     return np.max(max_distribution), np.min(min_distribution)
 
     @staticmethod
     def compute_correlation(
@@ -1562,9 +1721,4 @@ if __name__ == "__main__":
     #         "tests", "oxygens", "distributions"
     #     ),
     # )
-    Utils.stratified_split2(
-        csv_path=Path(
-            "/home/cnrismn/git_workspace/GrapheNet/data_GO/training_dataset/dataset.csv"
-        ),
-        target="electron_affinity",
-    )
+    pass

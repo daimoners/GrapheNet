@@ -11,8 +11,10 @@ try:
         RandomRotation,
         Compose,
         ToPILImage,
+        RandomChoice,
     )
     from PIL import Image
+    import pandas as pd
 
 except Exception as e:
 
@@ -562,28 +564,104 @@ class DeepCNN(nn.Module):
         return out.size()[1]
 
 
+# class MyDatasetPng:
+#     """Class that generate a dataset for DataLoader module, given as input the paths of the .png files and the respective labels"""
+
+#     def __init__(
+#         self,
+#         paths,
+#         targets,
+#         resolution=160,
+#         enlargement_method="padding",
+#         phase="train",
+#     ):
+#         self.paths = paths
+#         self.targets = targets
+#         self.resolution = resolution
+#         self.enlargement_method = enlargement_method
+#         self.phase = phase
+#         self.data_augmentation = Compose(
+#             [
+#                 # ToPILImage(),
+#                 RandomHorizontalFlip(p=0.5),
+#                 RandomVerticalFlip(p=0.5),
+#                 RandomRotation(15),
+#             ]
+#         )
+
+#     def __len__(self):
+#         return len(self.paths)
+
+#     def __getitem__(self, i):
+#         img = cv2.imread(str(self.paths[i]), -1)
+#         if self.enlargement_method == "padding":
+#             img = Utils.padding_image(img, size=self.resolution)
+#         elif self.enlargement_method == "resize":
+#             img = cv2.resize(
+#                 img, (self.resolution, self.resolution), interpolation=cv2.INTER_CUBIC
+#             )
+#         if self.phase == "train" or self.phase == "val":
+#             img = (
+#                 Image.fromarray(img, "L")  # TODO ricontrollare tutta questa parte
+#                 if len(img.shape) == 2  #! meglio fare tutto direttamente con PIL
+#                 else Image.fromarray(img, "RGB")
+#             )
+#             img = self.data_augmentation(img)
+#         img = np.asarray(img, float) / 255.0
+
+#         target = np.array(float(self.targets[i]))
+
+#         n_atoms = np.loadtxt((self.paths[i]).with_suffix(".txt"))
+
+#         if len(img.shape) == 2:
+#             return (
+#                 torch.from_numpy(np.expand_dims(img.copy(), 0)).float(),
+#                 torch.from_numpy(n_atoms).float(),
+#                 torch.from_numpy(target).float(),
+#             )
+#         elif len(img.shape) == 3 and img.shape[2] == 3:
+#             return (
+#                 torch.squeeze(
+#                     torch.from_numpy(np.expand_dims(img.copy(), 0))
+#                     .permute(0, 3, 1, 2)
+#                     .float()
+#                 ),
+#                 torch.from_numpy(n_atoms).float(),
+#                 torch.from_numpy(target).float(),
+#             )
+#         else:
+#             raise Exception("Wrong dimensions for the input images\n")
+
+
 class MyDatasetPng:
     """Class that generate a dataset for DataLoader module, given as input the paths of the .png files and the respective labels"""
 
     def __init__(
         self,
         paths,
-        targets,
+        df,
+        target,
         resolution=160,
         enlargement_method="padding",
         phase="train",
     ):
         self.paths = paths
-        self.targets = targets
+        self.df = df
+        self.target = target
         self.resolution = resolution
         self.enlargement_method = enlargement_method
         self.phase = phase
+
+        self.rotation_angles = [0, 90, 180, 270]
         self.data_augmentation = Compose(
             [
-                # ToPILImage(),
-                RandomHorizontalFlip(p=0.5),
-                RandomVerticalFlip(p=0.5),
-                RandomRotation(15),
+                ToPILImage(),
+                RandomChoice(
+                    [
+                        RandomRotation((angle, angle), interpolation=Image.NEAREST)
+                        for angle in self.rotation_angles
+                    ]
+                ),
             ]
         )
 
@@ -599,23 +677,24 @@ class MyDatasetPng:
                 img, (self.resolution, self.resolution), interpolation=cv2.INTER_CUBIC
             )
         if self.phase == "train" or self.phase == "val":
-            img = (
-                Image.fromarray(img, "L")  # TODO ricontrollare tutta questa parte
-                if len(img.shape) == 2  #! meglio fare tutto direttamente con PIL
-                else Image.fromarray(img, "RGB")
-            )
             img = self.data_augmentation(img)
         img = np.asarray(img, float) / 255.0
 
-        target = np.array(float(self.targets[i]))
+        if "R" in self.paths[i].stem:
+            file_name = self.paths[i].stem[:-3]
+        else:
+            file_name = self.paths[i].stem
 
-        n_atoms = np.loadtxt((self.paths[i]).with_suffix(".txt"))
+        index = self.df[self.df["file_name"] == file_name].index[0]
+        target_value = np.array(float(self.df.loc[index, self.target]))
+
+        n_atoms = np.loadtxt((self.paths[i]).with_name(f"{file_name}.txt"))
 
         if len(img.shape) == 2:
             return (
                 torch.from_numpy(np.expand_dims(img.copy(), 0)).float(),
                 torch.from_numpy(n_atoms).float(),
-                torch.from_numpy(target).float(),
+                torch.from_numpy(target_value).float(),
             )
         elif len(img.shape) == 3 and img.shape[2] == 3:
             return (
@@ -625,7 +704,69 @@ class MyDatasetPng:
                     .float()
                 ),
                 torch.from_numpy(n_atoms).float(),
-                torch.from_numpy(target).float(),
+                torch.from_numpy(target_value).float(),
+            )
+        else:
+            raise Exception("Wrong dimensions for the input images\n")
+
+
+class NewMyDatasetPng:
+    """Class that generate a dataset for DataLoader module, given as input the paths of the .png files and the respective labels"""
+
+    def __init__(
+        self,
+        paths,
+        df,
+        target,
+        resolution=160,
+        enlargement_method="padding",
+        phase="train",
+    ):
+        self.paths = paths
+        self.df = df
+        self.target = target
+        self.resolution = resolution
+        self.enlargement_method = enlargement_method
+        self.phase = phase
+
+    def __len__(self):
+        return len(self.paths)
+
+    def __getitem__(self, i):
+        img = cv2.imread(str(self.paths[i]), -1)
+        if self.enlargement_method == "padding":
+            img = Utils.padding_image(img, size=self.resolution)
+        elif self.enlargement_method == "resize":
+            img = cv2.resize(
+                img, (self.resolution, self.resolution), interpolation=cv2.INTER_CUBIC
+            )
+        img = np.asarray(img, float) / 255.0
+
+        if "R" in self.paths[i].stem:
+            file_name = self.paths[i].stem.split("_R")[0]
+        else:
+            file_name = self.paths[i].stem
+
+        index = self.df[self.df["file_name"] == file_name].index[0]
+        target_value = np.array(float(self.df.loc[index, self.target]))
+
+        n_atoms = np.loadtxt((self.paths[i]).with_name(f"{file_name}.txt"))
+
+        if len(img.shape) == 2:
+            return (
+                torch.from_numpy(np.expand_dims(img.copy(), 0)).float(),
+                torch.from_numpy(n_atoms).float(),
+                torch.from_numpy(target_value).float(),
+            )
+        elif len(img.shape) == 3 and img.shape[2] == 3:
+            return (
+                torch.squeeze(
+                    torch.from_numpy(np.expand_dims(img.copy(), 0))
+                    .permute(0, 3, 1, 2)
+                    .float()
+                ),
+                torch.from_numpy(n_atoms).float(),
+                torch.from_numpy(target_value).float(),
             )
         else:
             raise Exception("Wrong dimensions for the input images\n")
