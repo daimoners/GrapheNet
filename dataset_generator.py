@@ -16,16 +16,17 @@ def main(cfg):
 
     start = time.time()
 
-    Utils.create_subset_xyz(
-        xyz_path=Path()
-        .resolve()
-        .parent.joinpath("Chemception", "data", "xyz_files_opt"),
-        dpath=Path(cfg.path_xyz),
-        n_items=7000,
-        targets=cfg.features,
-        oxygen_distribution_threshold=cfg.randomly.oxygen_outliers_th,
-        min_num_atoms=cfg.randomly.min_num_atoms,
-    )
+    # Utils.create_subset_xyz(
+    #     xyz_path=Path()
+    #     .resolve()
+    #     .parent.joinpath("Chemception", "data", "xyz_files_opt"),
+    #     dpath=Path(cfg.path_xyz),
+    #     n_items=7000,
+    #     targets=cfg.features,
+    #     oxygen_distribution_threshold=cfg.randomly.oxygen_outliers_th,
+    #     min_num_atoms=cfg.randomly.min_num_atoms,
+    #     drop_custom=True,
+    # )
 
     dataset = DatasetGenerator(cfg)
 

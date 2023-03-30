@@ -865,19 +865,21 @@ class Utils:
 
         print("Dropping outliers from the dataset...\n")
 
-        el_aff_down = df.index[df["electron_affinity"] <= -7].tolist()
-        el_aff_up = df.index[df["electron_affinity"] >= -4].tolist()
-        el_aff = [*el_aff_down, *el_aff_up]
+        # el_aff_down = df.index[df["electron_affinity"] <= -7].tolist()
+        el_aff_up = df.index[df["electron_affinity"] > -5.7].tolist()
+        el_aff = [*el_aff_up]
 
-        elneg_down = df.index[df["electronegativity"] <= -6.2].tolist()
-        elneg_up = df.index[df["electronegativity"] >= -4].tolist()
-        elneg = [*elneg_down, *elneg_up]
+        # elneg_down = df.index[df["electronegativity"] <= -6.2].tolist()
+        # elneg_up = df.index[df["electronegativity"] >= -4].tolist()
+        # elneg = [*elneg_down, *elneg_up]
 
-        i_pot_down = df.index[df["ionization_potential"] <= -6.0].tolist()
-        i_pot_up = df.index[df["ionization_potential"] >= -3.5].tolist()
-        i_pot = [*i_pot_down, *i_pot_up]
+        # i_pot_down = df.index[df["ionization_potential"] <= -6.0].tolist()
+        # i_pot_up = df.index[df["ionization_potential"] >= -3.5].tolist()
+        # i_pot = [*i_pot_down, *i_pot_up]
 
-        indices = [*el_aff, *elneg, *i_pot]
+        # indices = [*el_aff, *elneg, *i_pot]
+
+        indices = [*el_aff]
 
         df = df.drop(indices, axis=0)
 

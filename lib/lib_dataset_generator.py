@@ -5,6 +5,7 @@ try:
     import pandas as pd
     import shutil
     from pathlib import Path
+    import random
 
 except Exception as e:
 
@@ -40,6 +41,70 @@ class DatasetGenerator(object):
                 pbar.update(1)
         pbar.close()
 
+    @staticmethod
+    def drop_custom(
+        df: pd.DataFrame,
+    ):
+
+        indices = df.index[df["electron_affinity"] < -5.7].tolist()
+
+        df = df.drop(indices, axis=0)
+
+        return df
+
+    @staticmethod
+    def filter_csv(
+        csv_path: Path,
+        dpath: Path,
+        n_items: int,
+        oxygen_outliers_th: float = 0.0,
+        min_num_atoms: int | list = 0,
+        drop_custom: bool = False,
+    ):
+        dpath.mkdir(exist_ok=True, parents=True)
+
+        df = pd.read_csv(csv_path)
+
+        if oxygen_outliers_th != 0.0:
+            df = df[df["distribution_mean"] > oxygen_outliers_th]
+            print(f"Lenght after dropping oxygen distribution outliers: {len(df)}")
+
+        if min_num_atoms != 0:
+            if isinstance(min_num_atoms, int):
+                df = df[df["atom_number_total"] > min_num_atoms]
+            elif isinstance(min_num_atoms, list):
+                df = df[
+                    df["atom_number_total"].between(min_num_atoms[0], min_num_atoms[1])
+                ]
+            else:
+                raise Exception(f"Wrong class for {min_num_atoms}")
+            print(f"Lenght after dropping min num atoms outliers: {len(df)}")
+
+        if drop_custom:
+            df = DatasetGenerator.drop_custom(df)
+            print(f"Lenght after dropping custom outliers: {len(df)}")
+
+        if n_items == 0:
+            df.to_csv(dpath.joinpath("dataset.csv"))
+
+        else:
+
+            items = random.sample(df["file_name"].tolist(), k=n_items)
+            df = df[df["file_name"].isin(items)]
+
+            df.to_csv(dpath.joinpath("dataset.csv"))
+
+    @staticmethod
+    def copy_xyz_files(csv_path: Path, spath: Path, dpath: Path):
+
+        dpath.mkdir(exist_ok=True, parents=True)
+
+        df = pd.read_csv(csv_path)
+        names = df["file_name"].to_list()
+
+        for name in tqdm(names):
+            shutil.copy(spath.joinpath(f"{name}.xyz"), dpath.joinpath(f"{name}.xyz"))
+
     def __init__(self, cfg):
         self.spath = Path(cfg.spath)
         self.dpath = Path(cfg.dpath)
@@ -60,7 +125,26 @@ class DatasetGenerator(object):
 
         self.target = cfg.target
 
+        self.stock_dataset_path = Path(cfg.stock_csv_path)
+        self.n_items = cfg.randomly.n_items
+        self.oxygen_outliers_th = cfg.randomly.oxygen_outliers_th
+        self.min_num_atoms = cfg.randomly.min_num_atoms
+        self.drop_custom_flag = cfg.randomly.drop_custom
+
         if not self.csv_flag:
+            DatasetGenerator.filter_csv(
+                csv_path=self.stock_dataset_path,
+                dpath=self.path_xyz,
+                n_items=self.n_items,
+                oxygen_outliers_th=self.oxygen_outliers_th,
+                min_num_atoms=self.min_num_atoms,
+                drop_custom=self.drop_custom_flag,
+            )
+            DatasetGenerator.copy_xyz_files(
+                csv_path=self.path_xyz.joinpath("dataset.csv"),
+                spath=self.stock_dataset_path.parent,
+                dpath=self.path_xyz,
+            )
             DatasetGenerator.generate_cropped_png_dataset_from_xyz(
                 spath=self.path_xyz, dpath=self.spath
             ) if not self.spath.is_dir() else None

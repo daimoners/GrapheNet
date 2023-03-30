@@ -9,9 +9,9 @@ num_workers: 6
 package_path: /home/cnrismn/git_workspace/GrapheNet
 resolution: 145
 sample: /home/cnrismn/git_workspace/GrapheNet/dftb/neutral_1021/neutral_1021.png
-target: total_energy
+target: electron_affinity
 train:
-  base_lr: 0.0
+  base_lr: 0.061813296683228255
   batch_size: 64
   dpath: ${train.spath}/models/${target}
   lr_list:
@@ -21,4 +21,4 @@ train:
     ionization_potential: 0.02133368544635407
     total_energy: 0.014135120055669028
   num_epochs: 150
-  spath: ${package_path}/data_GO/training_dataset_complete
+  spath: ${package_path}/data_GO_EA_threshold_5.7/training_dataset

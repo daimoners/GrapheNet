@@ -21,7 +21,8 @@ data_GO_high_num_atoms/
 data_GO_num_atoms_5000/
 data_GO_num_atoms_250_1500/
 data_GO_z_relative/
-data_GO_atoms_0_350/
+data_GO_num_atoms_0_350/
 data_GO_last_test/
 data_GO_num_atoms_500_2000/
 data_GO_num_atoms_650_2000/
+data_GO_EA_threshold_5.7/
