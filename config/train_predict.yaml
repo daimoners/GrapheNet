@@ -4,6 +4,9 @@ cluster_num_workers: 8
 coulomb: false
 deterministic: true
 enlargement_method: padding
+logger:
+  project_name: graphenet
+  user: tommaso-forni
 normalize: None
 num_workers: 6
 package_path: /home/cnrismn/git_workspace/GrapheNet
@@ -13,6 +16,7 @@ target: electron_affinity
 train:
   base_lr: 0.061813296683228255
   batch_size: 64
+  compile: true
   dpath: ${train.spath}/models/${target}
   lr_list:
     Fermi_energy: 0.09653253233375945
@@ -20,5 +24,6 @@ train:
     electronegativity: 0.04048360377132749
     ionization_potential: 0.02133368544635407
     total_energy: 0.014135120055669028
+  matmul_precision: ""
   num_epochs: 150
   spath: ${package_path}/data_GO_EA_threshold_5.7/training_dataset

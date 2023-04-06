@@ -1,5 +1,4 @@
 try:
-
     import torch
     import torch.nn as nn
     import torch.optim
@@ -7,9 +6,9 @@ try:
     from torch.utils.data import DataLoader
     import pandas as pd
     from pathlib import Path
-    import pytorch_lightning as pl
-    from pytorch_lightning.callbacks import RichProgressBar
-    from pytorch_lightning.callbacks.progress.rich_progress import RichProgressBarTheme
+    import lightning as pl
+    from lightning.pytorch.callbacks import RichProgressBar
+    from lightning.pytorch.callbacks.progress.rich_progress import RichProgressBarTheme
     import numpy as np
     from lib.lib_networks import (
         InceptionResNet,
@@ -23,8 +22,7 @@ try:
     )
 
 except Exception as e:
-
-    print("Some module are missing {}".format(e))
+    print(f"Some module are missing from {__file__}: {e}\n")
 
 
 class MyRegressor(pl.LightningModule):
@@ -42,6 +40,10 @@ class MyRegressor(pl.LightningModule):
         self.coulomb = cfg.coulomb
         self.num_epochs = cfg.train.num_epochs
         self.batch_size = cfg.train.batch_size
+
+        self.val_loss_step_holder = []
+        self.val_acc_step_holder = []
+        self.compiled = cfg.train.compile
 
         if self.normalize == "z_score":
             mean_std = np.loadtxt(
@@ -113,8 +115,9 @@ class MyRegressor(pl.LightningModule):
             else 1,
         )
 
-    def forward(self, x):
+        self.save_hyperparameters()
 
+    def forward(self, x):
         out = self.net(x)
 
         return out
@@ -163,9 +166,6 @@ class MyRegressor(pl.LightningModule):
         elif self.normalize == "boxcox":
             target = target + self.min
             target = (target**self._lambda - 1) / self._lambda
-            # target = (
-            #     torch.pow((target + (self.min + 1)), self._lambda) - 1
-            # ) / self._lambda
 
         return (
             torch.sqrt(l2(output, target))
@@ -227,12 +227,21 @@ class MyRegressor(pl.LightningModule):
         loss = self.criterion(y_hat, y, n_atoms)
         acc = self.accuracy(y_hat, y, n_atoms)
 
-        self.log(
-            "val_loss", loss, on_epoch=True, prog_bar=True, logger=True, on_step=False
-        )
-        self.log(
-            "val_acc", acc, on_epoch=True, prog_bar=True, logger=True, on_step=False
-        )
+        if not self.compiled:
+            self.log(
+                "val_loss",
+                loss,
+                on_epoch=True,
+                prog_bar=True,
+                logger=True,
+                on_step=False,
+            )
+            self.log(
+                "val_acc", acc, on_epoch=True, prog_bar=True, logger=True, on_step=False
+            )
+
+        self.val_loss_step_holder.append(loss)
+        self.val_acc_step_holder.append(acc)
 
         return loss
 
@@ -245,8 +254,26 @@ class MyRegressor(pl.LightningModule):
         self.plot_y = [*self.plot_y, *y.tolist()]
         self.plot_y_hat = [*self.plot_y_hat, *predictions.tolist()]
 
-    def validation_epoch_end(self, outputs):
-        loss = sum(output for output in outputs) / len(outputs)
+    def on_validation_epoch_end(self):
+        loss = torch.stack(self.val_loss_step_holder).mean(dim=0)
+        acc = torch.stack(self.val_acc_step_holder).mean(dim=0)
+        if self.compiled:
+            self.log(
+                "val_loss",
+                loss,
+                on_epoch=True,
+                prog_bar=True,
+                logger=True,
+                on_step=False,
+            )
+            self.log(
+                "val_acc",
+                acc,
+                on_epoch=True,
+                prog_bar=True,
+                logger=True,
+                on_step=False,
+            )
         self.count += 1
         if self.min_val_loss > loss:
             print(
@@ -254,6 +281,9 @@ class MyRegressor(pl.LightningModule):
             )
             self.min_val_loss = loss
             self.count = 0
+
+        self.val_loss_step_holder.clear()
+        self.val_acc_step_holder.clear()
 
     def on_test_start(self):
         self.errors.clear()
@@ -281,7 +311,7 @@ class MyRegressor(pl.LightningModule):
                 time="#e8c309",
                 processing_speed="#e8c309",
                 metrics="#dbd7d7",
-            )
+            ),
         )
 
         return progress_bar
@@ -305,7 +335,6 @@ class MyDataloader(pl.LightningDataModule):
         self.coulomb = cfg.coulomb
 
     def setup(self, stage=None):
-
         train_dataset = pd.read_csv(Path(self.spath).joinpath("train", "train.csv"))
         val_dataset = pd.read_csv(Path(self.spath).joinpath("val", "val.csv"))
         test_dataset = pd.read_csv(Path(self.spath).joinpath("test", "test.csv"))

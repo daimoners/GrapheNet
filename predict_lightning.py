@@ -1,8 +1,7 @@
 try:
-
     from lib.lib_trainer_predictor_lightning import MyRegressor, MyDataloader
     import hydra
-    from pytorch_lightning import Trainer, seed_everything
+    from lightning import Trainer, seed_everything
     from pathlib import Path
     import numpy as np
     from lib.lib_utils import Utils
@@ -10,12 +9,10 @@ try:
     from telegram_bot import send_message
 
 except Exception as e:
-
-    print("Some module are missing {}".format(e))
+    print(f"Some module are missing from {__file__}: {e}\n")
 
 
 def get_checkpoint_name(checkpoints_path: Path):
-
     best_loss = [
         model
         for model in checkpoints_path.iterdir()
@@ -27,7 +24,6 @@ def get_checkpoint_name(checkpoints_path: Path):
 
 @hydra.main(version_base="1.2", config_path="config", config_name="train_predict")
 def main(cfg):
-
     seed_everything(42, workers=True)
 
     checkpoints = get_checkpoint_name(Path(cfg.train.dpath))

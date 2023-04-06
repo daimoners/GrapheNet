@@ -1,5 +1,4 @@
 try:
-
     import subprocess
     from lib.lib_utils import Utils
     import hydra
@@ -7,14 +6,12 @@ try:
     from telegram_bot import send_images
 
 except Exception as e:
-
     print("Some module are missing {}".format(e))
 
 
 @hydra.main(version_base="1.2", config_path="config", config_name="train_predict")
 def main(cfg):
     for target in list(cfg.train.lr_list.keys()):
-
         Utils.update_yaml(
             spath=Path().resolve().joinpath("config", "train_predict.yaml"),
             target_key="target",
@@ -40,11 +37,11 @@ def main(cfg):
         )
         process.wait()
 
-        print(f"Prediction for target: {target}\n")
-        process = subprocess.Popen(
-            ["python", str(Path().resolve().joinpath("predict_lightning.py"))]
-        )
-        process.wait()
+        # print(f"Prediction for target: {target}\n")
+        # process = subprocess.Popen(
+        #     ["python", str(Path().resolve().joinpath("predict_lightning.py"))]
+        # )
+        # process.wait()
 
     Utils.update_yaml(
         spath=Path().resolve().joinpath("config", "train_predict.yaml"),
