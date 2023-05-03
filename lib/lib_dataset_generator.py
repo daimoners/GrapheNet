@@ -1,5 +1,4 @@
 try:
-
     from tqdm import tqdm
     from lib.lib_utils import Utils
     import pandas as pd
@@ -8,7 +7,6 @@ try:
     import random
 
 except Exception as e:
-
     print("Some module are missing {}".format(e))
 
 
@@ -17,10 +15,8 @@ class DatasetGenerator(object):
     def generate_cropped_png_dataset_from_xyz(
         spath: Path,
         dpath: Path,
-        resolution=320,
         z_relative=False,
     ):
-
         dpath.mkdir(parents=True, exist_ok=True)
 
         if not z_relative and not spath.joinpath("max_min_coordinates.txt").is_file():
@@ -35,7 +31,6 @@ class DatasetGenerator(object):
                 Utils.generate_png(
                     file,
                     dpath,
-                    resolution,
                     z_relative=z_relative,
                 )
                 pbar.update(1)
@@ -45,8 +40,9 @@ class DatasetGenerator(object):
     def drop_custom(
         df: pd.DataFrame,
     ):
+        # indices = df.index[df["electron_affinity"] < -5.7].tolist()
 
-        indices = df.index[df["electron_affinity"] < -5.7].tolist()
+        indices = df.index[~df["electron_affinity"].between(-5.9, -5.2)].tolist()
 
         df = df.drop(indices, axis=0)
 
@@ -88,15 +84,15 @@ class DatasetGenerator(object):
             df.to_csv(dpath.joinpath("dataset.csv"))
 
         else:
-
             items = random.sample(df["file_name"].tolist(), k=n_items)
             df = df[df["file_name"].isin(items)]
 
             df.to_csv(dpath.joinpath("dataset.csv"))
 
     @staticmethod
-    def copy_xyz_files(csv_path: Path, spath: Path, dpath: Path):
-
+    def copy_xyz_files(
+        csv_path: Path, spath: Path, dpath: Path, complete_csv_path: Path = None
+    ):
         dpath.mkdir(exist_ok=True, parents=True)
 
         df = pd.read_csv(csv_path)
@@ -104,6 +100,11 @@ class DatasetGenerator(object):
 
         for name in tqdm(names):
             shutil.copy(spath.joinpath(f"{name}.xyz"), dpath.joinpath(f"{name}.xyz"))
+
+        if complete_csv_path is not None:
+            complete_df = pd.read_csv(complete_csv_path)
+            complete_df = complete_df[complete_df["file_name"].isin(names)]
+            complete_df.to_csv(dpath.joinpath("dataset.csv"))
 
     def __init__(self, cfg):
         self.spath = Path(cfg.spath)
@@ -118,7 +119,6 @@ class DatasetGenerator(object):
         self.path_csv = Path(cfg.path_csv)
         self.path_xyz = Path(cfg.path_xyz)
 
-        self.csv_flag = cfg.from_csv.flag
         self.csv_dataset_path = Path(cfg.from_csv.csv_dataset_path)
 
         self.package_path = cfg.package_path
@@ -131,7 +131,7 @@ class DatasetGenerator(object):
         self.min_num_atoms = cfg.randomly.min_num_atoms
         self.drop_custom_flag = cfg.randomly.drop_custom
 
-        if not self.csv_flag:
+        if not self.csv_dataset_path.is_file():
             DatasetGenerator.filter_csv(
                 csv_path=self.stock_dataset_path,
                 dpath=self.path_xyz,
@@ -145,14 +145,21 @@ class DatasetGenerator(object):
                 spath=self.stock_dataset_path.parent,
                 dpath=self.path_xyz,
             )
-            DatasetGenerator.generate_cropped_png_dataset_from_xyz(
-                spath=self.path_xyz, dpath=self.spath
-            ) if not self.spath.is_dir() else None
-            self.split_dataset()
-            Utils.generate_num_atoms(dataset_path=self.dpath, xyz_path=self.path_xyz)
-            Utils.find_max_dimensions_png_folder(spath=self.spath, dpath=self.dpath)
         else:
-            self.split_dataset_from_csv()
+            DatasetGenerator.copy_xyz_files(
+                csv_path=self.csv_dataset_path,
+                spath=self.stock_dataset_path.parent,
+                dpath=self.path_xyz,
+                complete_csv_path=self.stock_dataset_path,
+            )
+        DatasetGenerator.generate_cropped_png_dataset_from_xyz(
+            spath=self.path_xyz, dpath=self.spath
+        ) if not self.spath.is_dir() else None
+        self.split_dataset()
+        Utils.generate_num_atoms(dataset_path=self.dpath, xyz_path=self.path_xyz)
+        Utils.find_max_dimensions_png_folder(spath=self.spath, dpath=self.dpath)
+        shutil.rmtree(self.spath)
+        shutil.rmtree(self.path_xyz)
 
     def split_dataset(self):
         # split the dataset in train and test set
@@ -195,8 +202,7 @@ class DatasetGenerator(object):
                 dpath=self.dpath.joinpath("val", "distributions"),
             )
 
-    def split_dataset_from_csv(self):
-
+    def split_dataset_from_csv(self):  #! DEPRECATED
         # split the dataset in train and test set
         print("Splitting the dataset in train/test/validation set...\n")
 

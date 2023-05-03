@@ -1,5 +1,4 @@
 try:
-
     from datetime import datetime
     import seaborn as sns
     import numpy as np
@@ -21,7 +20,6 @@ try:
     from scipy.spatial.distance import pdist
 
 except Exception as e:
-
     print("Some module are missing {}".format(e))
 
 
@@ -38,7 +36,6 @@ class Utils:
         atoms = []
 
         with open(str(spath), "r") as f:
-
             for line in f:
                 l = line.split()
                 if len(l) == 4:
@@ -55,7 +52,6 @@ class Utils:
 
     @staticmethod
     def crop_image(image: Image, name: str = None, dpath: Path = None) -> Image:
-
         image_data = np.asarray(image)
         if len(image_data.shape) == 2:
             image_data_bw = image_data
@@ -89,7 +85,6 @@ class Utils:
     def generate_png(
         spath: Path,
         dpath: Path,
-        resolution=320,
         z_relative=False,
         single_channel_images=False,
     ):
@@ -546,7 +541,6 @@ class Utils:
 
     @staticmethod
     def padding_image(image, size=160):
-
         h = image.shape[0]
         w = image.shape[1]
 
@@ -564,7 +558,6 @@ class Utils:
 
     @staticmethod
     def build_csv_from_png_files(spath: Path, targets: list = ["total_energy"]):
-
         train_path = spath.joinpath("train")
         test_path = spath.joinpath("test")
         val_path = spath.joinpath("val")
@@ -635,7 +628,6 @@ class Utils:
 
     @staticmethod
     def find_num_workers(dataset):
-
         seconds = []
         workers = []
 
@@ -662,7 +654,6 @@ class Utils:
 
     @staticmethod
     def plot_distribution(spath: Path, csv: Path, features: list, dpath: Path):
-
         dpath.mkdir(parents=True, exist_ok=True)
 
         sns.set_style("white")
@@ -680,7 +671,6 @@ class Utils:
                     indices.append(index[0])
 
         for i in range(len(features)):
-
             x = df[features[i]][indices]
 
             # Plot
@@ -696,7 +686,6 @@ class Utils:
 
     @staticmethod
     def date_and_time() -> str:
-
         now = datetime.now()
         dt_string = now.strftime("%d/%m/%Y %H:%M:%S")
 
@@ -762,7 +751,6 @@ class Utils:
 
     @staticmethod
     def compute_lambda_boxcox(csv_path: Path, target: str):
-
         df = pd.read_csv(csv_path)
 
         target_values = df[target].to_numpy()
@@ -801,9 +789,7 @@ class Utils:
 
         for dir in ["train", "val", "test"]:
             for file in tqdm(dataset_path.joinpath(dir).iterdir()):
-
                 if file.suffix == format:
-
                     X, Y, Z, atoms = Utils.read_from_xyz_file(
                         xyz_path.joinpath(file.stem + ".xyz")
                     )
@@ -818,7 +804,6 @@ class Utils:
 
                     lines = []
                     with open(dataset_path.joinpath(dir, file.stem + ".txt"), "w") as f:
-
                         lines.append(f"{n_C}\n") if n_C > 0 else None
                         lines.append(f"{n_O}\n") if n_O > 0 else None
                         lines.append(f"{n_H}\n") if n_H > 0 else None
@@ -828,14 +813,15 @@ class Utils:
         if info_max_atoms:
             lines.clear()
             with open(dataset_path.joinpath("flake_max_atoms.txt"), "w") as f:
-
                 lines.append(f"Flake Name = {flake_max_atoms}\n")
                 lines.append(f"Max Atoms = {max_atoms}\n")
 
                 f.writelines(lines)
 
     @staticmethod
-    def plot_fit(y: list, y_hat: list, dpath: Path, target: str):
+    def plot_fit(
+        y: list, y_hat: list, dpath: Path, target: str, colormap: str = "plasma"
+    ):
         def r2_score(y_pred, y_true):
             y_pred = np.array(y_pred)
             y_true = np.array(y_true)
@@ -847,22 +833,45 @@ class Utils:
         min = np.min([np.min(y), np.min(y_hat)])
         max = np.max([np.max(y), np.max(y_hat)])
 
+        MAEs = np.abs(np.array(y_hat) - np.array(y)) / np.abs(np.array(y))
+
         plt.figure(figsize=(10, 7))
         plt.plot(
             [min, max],
             [min, max],
         )
-        plt.scatter(y_hat, y, color="red")
+        plt.scatter(y_hat, y, c=MAEs, cmap=plt.cm.get_cmap(colormap))
+        cbar = plt.colorbar()
+        cbar.set_label("Color Values")
         plt.xlabel("Predictions")
         plt.ylabel("Targets")
         plt.title(f"{target} - R2 = {r2_score(y_hat,y):.3f}")
         plt.savefig(str(dpath))
 
     @staticmethod
+    def write_csv_results(
+        y: list,
+        y_hat: list,
+        names: list,
+        dpath: Path,
+        target: str,
+    ):
+        df = pd.DataFrame()
+        df["file_name"] = names
+        df[f"{target}_real"] = y
+        df[f"{target}_predicted"] = y_hat
+        df[f"{target}_MAE"] = (
+            np.abs(np.array(y_hat) - np.array(y)) / np.abs(np.array(y)) * 100.0
+        )
+
+        df = df.sort_values(by=f"{target}_MAE", ascending=False)
+
+        df.to_csv(dpath)
+
+    @staticmethod
     def drop_custom(
         df: pd.DataFrame,
     ):
-
         print("Dropping outliers from the dataset...\n")
 
         # el_aff_down = df.index[df["electron_affinity"] <= -7].tolist()
@@ -898,7 +907,6 @@ class Utils:
             "Fermi_energy",
         ],
     ) -> pd.DataFrame:
-
         MAX, MIN = OxygenUtils.find_max_min_distribution(csv_path, xyz_path, targets)
 
         df = pd.read_csv(str(csv_path))
@@ -911,7 +919,6 @@ class Utils:
         d = []
 
         for file in tqdm(names):
-
             X, Y, Z, atoms = Utils.read_from_xyz_file(xyz_path.joinpath(file + ".xyz"))
 
             distribution.clear()
@@ -974,7 +981,6 @@ class Utils:
         drop_custom: bool = False,
         min_num_atoms: int | list = None,
     ):
-
         targets = ["file_name", *targets]
 
         dpath.mkdir(parents=True, exist_ok=True)
@@ -983,7 +989,6 @@ class Utils:
             oxygen_distribution_threshold is None
             or oxygen_distribution_threshold == 0.0
         ):
-
             df = pd.read_csv(xyz_path.joinpath("dataset.csv"))
 
             df = Utils.drop_nan_and_zeros(df)
@@ -1020,7 +1025,6 @@ class Utils:
             df.to_csv(dpath.joinpath("dataset.csv"))
 
         else:
-
             df = Utils.drop_by_oxygen_distribution(
                 csv_path=xyz_path.joinpath("dataset.csv"),
                 xyz_path=xyz_path,
@@ -1059,7 +1063,6 @@ class Utils:
 
     @staticmethod
     def drop_min_num_atoms(df: pd.DataFrame, min_num_atoms: int | list):
-
         print("Dropping outliers from the dataset...\n")
 
         if isinstance(min_num_atoms, int):
@@ -1323,7 +1326,6 @@ class CoulombUtils:
 
     @staticmethod
     def generate_coulomb_matrices(spath: Path, dpath: Path, fast: False):
-
         dpath.mkdir(parents=True, exist_ok=True)
 
         items = [f for f in spath.iterdir() if f.suffix == ".xyz"]
@@ -1340,7 +1342,6 @@ class CoulombUtils:
 
     @staticmethod
     def restore_symmetric_matrix(matrix: np.array):
-
         # Reconstruct the symmetric matrix
         symmetric_matrix = matrix - np.transpose(matrix)
 
@@ -1391,7 +1392,6 @@ class OxygenUtils:
             "Fermi_energy",
         ],
     ) -> np.array:
-
         MAX, MIN = OxygenUtils.find_max_min_distribution(csv_path, xyz_path)
 
         df = pd.read_csv(str(csv_path))
@@ -1408,7 +1408,6 @@ class OxygenUtils:
         distribution_means = []
 
         for name in tqdm(names):
-
             distribution_means.append(
                 OxygenUtils.compute_mean_oxygen_distance(
                     xyz_path.joinpath(name + ".xyz")
@@ -1640,7 +1639,6 @@ class OxygenUtils:
 
     @staticmethod
     def copy_distributions(dataset_path: Path, distribution_path: Path):
-
         train_path = dataset_path.joinpath("train")
         val_path = dataset_path.joinpath("val")
         test_path = dataset_path.joinpath("test")

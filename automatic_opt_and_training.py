@@ -49,21 +49,17 @@ def main(cfg):
         new_value=0.0,
     )
 
-    images_paths = []
-    captions = []
+    images = {}
     for target in list(cfg.train.lr_list.keys()):
-        images_paths.append(
-            Path(cfg.train.spath).joinpath("models", str(target), f"{target}_fit.png")
-        )
-        captions.append(
+        images[
             str(
                 Path(cfg.train.spath).joinpath(
                     "models", str(target), f"{target}_fit.png"
                 )
             )
-        )
+        ] = Path(cfg.train.spath).joinpath("models", str(target), f"{target}_fit.png")
 
-    send_images(images_paths, captions)
+    send_images(images)
 
 
 if __name__ == "__main__":

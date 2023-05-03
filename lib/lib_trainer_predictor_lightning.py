@@ -12,13 +12,14 @@ try:
     import numpy as np
     from lib.lib_networks import (
         InceptionResNet,
-        MyDatasetPng,
-        MyDatasetPngCluster,
+        # MyDatasetPng,
+        # MyDatasetPngCluster,
         MySimpleNet,
         MySimpleResNet,
         DeepCNN,
-        MyDatasetCoulombCluster,
+        # MyDatasetCoulomb,
         NewMyDatasetPng,
+        NewMyDatasetCoulomb,
     )
 
 except Exception as e:
@@ -37,12 +38,15 @@ class MyRegressor(pl.LightningModule):
         self.errors = []
         self.plot_y = []
         self.plot_y_hat = []
+        self.sample_names = []
         self.coulomb = cfg.coulomb
         self.num_epochs = cfg.train.num_epochs
         self.batch_size = cfg.train.batch_size
 
         self.val_loss_step_holder = []
         self.val_acc_step_holder = []
+        self.train_loss_step_holder = []
+        self.train_acc_step_holder = []
         self.compiled = cfg.train.compile
 
         if self.normalize == "z_score":
@@ -212,12 +216,8 @@ class MyRegressor(pl.LightningModule):
         loss = self.criterion(y_hat, y, n_atoms)
         acc = self.accuracy(y_hat, y, n_atoms)
 
-        self.log(
-            "train_loss", loss, on_epoch=True, prog_bar=True, logger=True, on_step=False
-        )
-        self.log(
-            "train_acc", acc, on_epoch=True, prog_bar=True, logger=True, on_step=False
-        )
+        self.train_loss_step_holder.append(loss)
+        self.train_acc_step_holder.append(acc)
 
         return loss
 
@@ -227,53 +227,44 @@ class MyRegressor(pl.LightningModule):
         loss = self.criterion(y_hat, y, n_atoms)
         acc = self.accuracy(y_hat, y, n_atoms)
 
-        if not self.compiled:
-            self.log(
-                "val_loss",
-                loss,
-                on_epoch=True,
-                prog_bar=True,
-                logger=True,
-                on_step=False,
-            )
-            self.log(
-                "val_acc", acc, on_epoch=True, prog_bar=True, logger=True, on_step=False
-            )
-
         self.val_loss_step_holder.append(loss)
         self.val_acc_step_holder.append(acc)
 
         return loss
 
     def test_step(self, test_batch, batch_idx=None):
-        x, n_atoms, y = test_batch
+        x, n_atoms, y, names = test_batch
         y_hat = self(x)
         error, predictions = self.accuracy(y_hat, y, n_atoms, test_step=True)
 
         self.errors = [*self.errors, *error.tolist()]
         self.plot_y = [*self.plot_y, *y.tolist()]
         self.plot_y_hat = [*self.plot_y_hat, *predictions.tolist()]
+        self.sample_names = [*self.sample_names, *names]
 
     def on_validation_epoch_end(self):
         loss = torch.stack(self.val_loss_step_holder).mean(dim=0)
         acc = torch.stack(self.val_acc_step_holder).mean(dim=0)
-        if self.compiled:
-            self.log(
-                "val_loss",
-                loss,
-                on_epoch=True,
-                prog_bar=True,
-                logger=True,
-                on_step=False,
-            )
-            self.log(
-                "val_acc",
-                acc,
-                on_epoch=True,
-                prog_bar=True,
-                logger=True,
-                on_step=False,
-            )
+
+        self.log(
+            "val_loss",
+            loss,
+            on_epoch=True,
+            prog_bar=True,
+            logger=True,
+            on_step=False,
+            sync_dist=True,
+        )
+        self.log(
+            "val_acc",
+            acc,
+            on_epoch=True,
+            prog_bar=True,
+            logger=True,
+            on_step=False,
+            sync_dist=True,
+        )
+
         self.count += 1
         if self.min_val_loss > loss:
             print(
@@ -285,10 +276,37 @@ class MyRegressor(pl.LightningModule):
         self.val_loss_step_holder.clear()
         self.val_acc_step_holder.clear()
 
+    def on_train_epoch_end(self):
+        loss = torch.stack(self.train_loss_step_holder).mean(dim=0)
+        acc = torch.stack(self.train_acc_step_holder).mean(dim=0)
+
+        self.log(
+            "train_loss",
+            loss,
+            on_epoch=True,
+            prog_bar=True,
+            logger=True,
+            on_step=False,
+            sync_dist=True,
+        )
+        self.log(
+            "train_acc",
+            acc,
+            on_epoch=True,
+            prog_bar=True,
+            logger=True,
+            on_step=False,
+            sync_dist=True,
+        )
+
+        self.train_loss_step_holder.clear()
+        self.train_acc_step_holder.clear()
+
     def on_test_start(self):
         self.errors.clear()
         self.plot_y.clear()
         self.plot_y_hat.clear()
+        self.sample_names.clear()
 
     def on_train_start(self):
         self.log_dict(
@@ -352,42 +370,25 @@ class MyDataloader(pl.LightningDataModule):
             f for f in Path(self.spath).joinpath("test").iterdir() if f.suffix == ".png"
         ]
 
-        if self.cluster:
-            if self.coulomb:
-                self.train_data = MyDatasetCoulombCluster(
-                    train_paths,
-                    train_dataset[self.target],
-                    resolution=self.resolution,
-                )
-                self.val_data = MyDatasetCoulombCluster(
-                    val_paths,
-                    val_dataset[self.target],
-                    resolution=self.resolution,
-                )
-                self.test_data = MyDatasetCoulombCluster(
-                    test_paths,
-                    test_dataset[self.target],
-                    resolution=self.resolution,
-                )
-            else:
-                self.train_data = MyDatasetPngCluster(
-                    train_paths,
-                    train_dataset[self.target],
-                    resolution=self.resolution,
-                    enlargement_method=self.enlargement_method,
-                )
-                self.val_data = MyDatasetPngCluster(
-                    val_paths,
-                    val_dataset[self.target],
-                    resolution=self.resolution,
-                    enlargement_method=self.enlargement_method,
-                )
-                self.test_data = MyDatasetPngCluster(
-                    test_paths,
-                    test_dataset[self.target],
-                    resolution=self.resolution,
-                    enlargement_method=self.enlargement_method,
-                )
+        if self.coulomb:
+            self.train_data = NewMyDatasetCoulomb(
+                train_paths,
+                train_dataset,
+                self.target,
+                resolution=self.resolution,
+            )
+            self.val_data = NewMyDatasetCoulomb(
+                val_paths,
+                val_dataset,
+                self.target,
+                resolution=self.resolution,
+            )
+            self.test_data = NewMyDatasetCoulomb(
+                test_paths,
+                test_dataset,
+                self.target,
+                resolution=self.resolution,
+            )
         else:
             self.train_data = NewMyDatasetPng(
                 train_paths,

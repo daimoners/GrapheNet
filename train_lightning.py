@@ -47,7 +47,7 @@ def save_model_summary(cfg: dict, model: MyRegressor):
     sys.stdout = captured
     summary(
         model.net.cuda(),
-        (cfg.atom_types, cfg.resolution, cfg.resolution),
+        (cfg.atom_types if not cfg.coulomb else 1, cfg.resolution, cfg.resolution),
         batch_size=cfg.train.batch_size,
         device="cuda",
     )
@@ -77,7 +77,7 @@ def set_logger(cfg):
         name=f"{cfg.target}_{now_string}",
     )
 
-    return logger
+    return logger, f"{cfg.target}_{now_string}"
 
 
 @hydra.main(version_base="1.2", config_path="config", config_name="train_predict")
@@ -105,6 +105,8 @@ def main(cfg):
 
     dataloaders = MyDataloader(cfg)
 
+    wandb_logger, experiment_name = set_logger(cfg)
+
     if cfg.cluster:
         trainer = Trainer(
             deterministic=cfg.deterministic,
@@ -118,7 +120,7 @@ def main(cfg):
                 model.get_progressbar(),
                 early_stopping,
             ],
-            logger=set_logger(cfg),
+            logger=wandb_logger,
         )
     else:
         trainer = Trainer(
@@ -131,7 +133,7 @@ def main(cfg):
                 model.get_progressbar(),
                 early_stopping,
             ],
-            logger=set_logger(cfg),
+            logger=wandb_logger,
         )
 
     write_results_yaml(cfg)
@@ -186,7 +188,7 @@ def main(cfg):
             results[key] = str(value)
 
     trainer.logger.log_text(
-        key="prediction_results",
+        key=f"prediction_results_{experiment_name}",
         columns=list(results.keys()),
         data=[list(results.values())],
     )

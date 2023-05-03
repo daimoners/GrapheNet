@@ -26,4 +26,4 @@ train:
     total_energy: 0.014135120055669028
   matmul_precision: ""
   num_epochs: 150
-  spath: ${package_path}/data_GO_EA_threshold_5.7/training_dataset
+  spath: ${package_path}/UMAP/cluster0_1_5_8_9_11_12_14_15_22/training_dataset
