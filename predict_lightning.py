@@ -71,6 +71,14 @@ def main(cfg):
         target=cfg.target,
     )
 
+    Utils.write_csv_results(
+        y=model.plot_y,
+        y_hat=model.plot_y_hat,
+        names=model.sample_names,
+        dpath=Path(cfg.train.dpath).joinpath(f"{cfg.target}_prediction_results.csv"),
+        target=cfg.target,
+    )
+
     message = f"Prediction on target `{cfg.target}` completed ✅:\n🔺 Maximum % error \\= `{np.max(model.errors):.5f}%`\n🔸 Mean % error \\= `{np.mean(model.errors):.5f}%`\n🔹 STD % error \\= `{np.std(model.errors):.5f}%`"
     send_message(message, parse_mode="MarkdownV2", disable_notification=True)
 

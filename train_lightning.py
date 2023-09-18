@@ -47,7 +47,7 @@ def save_model_summary(cfg: dict, model: MyRegressor):
     sys.stdout = captured
     summary(
         model.net.cuda(),
-        (cfg.atom_types, cfg.resolution, cfg.resolution),
+        (cfg.atom_types if not cfg.coulomb else 1, cfg.resolution, cfg.resolution),
         batch_size=cfg.train.batch_size,
         device="cuda",
     )
@@ -65,19 +65,6 @@ def get_model_name(model: MyRegressor):
     name = raw_name.translate(translate_table)
 
     return name.split(".")[-1]
-
-
-def set_logger(cfg):
-    now = datetime.now()
-    now_string = now.strftime("%b-%d-%Y_%H:%M:%S")
-
-    logger = WandbLogger(
-        project=cfg.logger.project_name,
-        log_model=True,
-        name=f"{cfg.target}_{now_string}",
-    )
-
-    return logger
 
 
 @hydra.main(version_base="1.2", config_path="config", config_name="train_predict")
@@ -107,18 +94,17 @@ def main(cfg):
 
     if cfg.cluster:
         trainer = Trainer(
-            deterministic=cfg.deterministic,
+            deterministic=True,
             accelerator="gpu",
             num_nodes=1,
-            devices=2,
-            strategy="ddp",
+            devices=1,
+            # strategy="ddp",
             max_epochs=cfg.train.num_epochs,
             callbacks=[
                 checkpoint_callback,
-                model.get_progressbar(),
-                early_stopping,
+                # model.get_progressbar(),
+                early_stopping,  # TODO provare a togliere l'early stop
             ],
-            logger=set_logger(cfg),
         )
     else:
         trainer = Trainer(
@@ -131,25 +117,11 @@ def main(cfg):
                 model.get_progressbar(),
                 early_stopping,
             ],
-            logger=set_logger(cfg),
         )
 
     write_results_yaml(cfg)
     write_results_yaml(cfg, data={"model_name": get_model_name(model)})
     save_model_summary(cfg, model)
-
-    # tuner = Tuner(trainer)
-    # # Run learning rate finder
-    # lr_finder = tuner.lr_find(
-    #     model,
-    #     dataloaders,
-    #     min_lr=1e-5,
-    #     max_lr=0.1,
-    # )
-    # # Pick point based on plot, or get suggestion
-    # new_lr = lr_finder.suggestion()
-    # # update hparams of the model
-    # model.learning_rate = new_lr
 
     start = time.time()
     trainer.fit(compiled_model, dataloaders) if cfg.train.compile else trainer.fit(
@@ -164,32 +136,9 @@ def main(cfg):
     write_results_yaml(cfg, data={"training_time": float((end - start) / 60)})
 
     process = subprocess.Popen(
-        ["python", str(Path().resolve().joinpath("predict_lightning.py"))]
+        ["python", str(Path(__file__).parent.joinpath("predict_lightning.py"))]
     )
     process.wait()
-
-    trainer.logger.log_image(
-        key="fit",
-        images=[str(Path(cfg.train.dpath).joinpath(f"{cfg.target}_fit.png"))],
-        caption=[f"{cfg.target}_fit.png"],
-    )
-
-    with open(
-        str(Path(cfg.train.dpath).joinpath(f"{cfg.target}_prediction_results.yaml")),
-        "r",
-    ) as file:
-        results = yaml.safe_load(file)
-    results["model_name"] = get_model_name(model)
-
-    for key, value in results.items():
-        if not isinstance(value, str):
-            results[key] = str(value)
-
-    trainer.logger.log_text(
-        key="prediction_results",
-        columns=list(results.keys()),
-        data=[list(results.values())],
-    )
 
 
 if __name__ == "__main__":

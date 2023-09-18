@@ -1,5 +1,4 @@
 try:
-
     from datetime import datetime
     import seaborn as sns
     import numpy as np
@@ -21,12 +20,32 @@ try:
     from scipy.spatial.distance import pdist
 
 except Exception as e:
-
     print("Some module are missing {}".format(e))
 
 
 class Utils:
     IMAGE_EXTENSIONS = (".jpg", ".png", ".jpeg")
+
+    @staticmethod
+    def find_first_empty_cell(matrix, x, y):
+        rows, cols = matrix.shape
+        adjacent_cells = [
+            (x - 1, y - 1),
+            (x - 1, y),
+            (x - 1, y + 1),
+            (x, y - 1),
+            (x, y + 1),
+            (x + 1, y - 1),
+            (x + 1, y),
+            (x + 1, y + 1),
+        ]
+
+        for adj_x, adj_y in adjacent_cells:
+            if 0 <= adj_x < rows and 0 <= adj_y < cols:
+                if matrix[adj_y, adj_x] == 0:
+                    return adj_x, adj_y
+
+        return None
 
     @staticmethod
     def read_from_xyz_file(spath: Path):
@@ -38,14 +57,26 @@ class Utils:
         atoms = []
 
         with open(str(spath), "r") as f:
-
             for line in f:
                 l = line.split()
-                if len(l) == 4:
+                if len(l) == 4 or len(l) == 5:
                     X.append(float(l[1]))
                     Y.append(float(l[2]))
                     Z.append(float(l[3]))
                     atoms.append(str(l[0]))
+
+        # if ("O" or "H") in atoms:
+        #     atom_order = {"C": 0, "O": 1, "H": 2}
+        #     sorted_indices = np.argsort([atom_order[atom] for atom in atoms])
+        #     X = np.asarray(X)[sorted_indices]
+        #     Y = np.asarray(Y)[sorted_indices]
+        #     Z = np.asarray(Z)[sorted_indices]
+        #     atoms = np.asarray(atoms)[sorted_indices]
+
+        # else:
+        #     X = np.asarray(X)
+        #     Y = np.asarray(Y)
+        #     Z = np.asarray(Z)
 
         X = np.asarray(X)
         Y = np.asarray(Y)
@@ -55,7 +86,6 @@ class Utils:
 
     @staticmethod
     def crop_image(image: Image, name: str = None, dpath: Path = None) -> Image:
-
         image_data = np.asarray(image)
         if len(image_data.shape) == 2:
             image_data_bw = image_data
@@ -89,7 +119,6 @@ class Utils:
     def generate_png(
         spath: Path,
         dpath: Path,
-        resolution=320,
         z_relative=False,
         single_channel_images=False,
     ):
@@ -152,24 +181,47 @@ class Utils:
 
         C_only = True
 
+        count = 0
+
         for i in range(len(X)):
             if atoms[i] == "C":
                 x_coord = int(round(X[i] * 2) + resolution / 2)
                 y_coord = int(round(Y[i] * 2) + resolution / 2)
                 if C[y_coord, x_coord] < z_norm(Z[i]):
                     C[y_coord, x_coord] = z_norm(Z[i])
+                # if C[y_coord, x_coord] == 0:
+                #     C[y_coord, x_coord] = z_norm(Z[i])
+                # elif Utils.find_first_empty_cell(C, x=x_coord, y=y_coord) is not None:            #! Qui ho provato a eliminare gli overlaps spostando l'atomo sovrapposto in un pixel adiacente, ma non ho trovato miglioramenti
+                #     adj_x, adj_y = Utils.find_first_empty_cell(C, x=x_coord, y=y_coord)
+                #     C[adj_y, adj_x] = z_norm(Z[i])
+                # else:
+                #     count += 1
             elif atoms[i] == "O":
                 C_only = False
                 x_coord = int(round(X[i] * 2) + resolution / 2)
                 y_coord = int(round(Y[i] * 2) + resolution / 2)
                 if O[y_coord, x_coord] < z_norm(Z[i]):
                     O[y_coord, x_coord] = z_norm(Z[i])
+                # if O[y_coord, x_coord] == 0:
+                #     O[y_coord, x_coord] = z_norm(Z[i])
+                # elif Utils.find_first_empty_cell(O, x=x_coord, y=y_coord) is not None:
+                #     adj_x, adj_y = Utils.find_first_empty_cell(O, x=x_coord, y=y_coord)
+                #     O[adj_y, adj_x] = z_norm(Z[i])
+                # else:
+                #     count += 1
             elif atoms[i] == "H":
                 C_only = False
                 x_coord = int(round(X[i] * 2) + resolution / 2)
                 y_coord = int(round(Y[i] * 2) + resolution / 2)
                 if H[y_coord, x_coord] < z_norm(Z[i]):
                     H[y_coord, x_coord] = z_norm(Z[i])
+                # if H[y_coord, x_coord] == 0:
+                #     H[y_coord, x_coord] = z_norm(Z[i])
+                # elif Utils.find_first_empty_cell(H, x=x_coord, y=y_coord) is not None:
+                #     adj_x, adj_y = Utils.find_first_empty_cell(H, x=x_coord, y=y_coord)
+                #     H[adj_y, adj_x] = z_norm(Z[i])
+                # else:
+                #     count += 1
 
         name = spath.stem
 
@@ -195,6 +247,89 @@ class Utils:
 
             image = Image.fromarray(Matrix)
             Utils.crop_image(image, name + ".png", dpath)
+
+            return count
+
+    @staticmethod
+    def generate_grayscale_png(
+        spath: Path,
+        dpath: Path,
+        z_relative=False,
+    ):
+        """Generate a .npy matrix starting from lists of x,y,z coordinates"""
+
+        X, Y, Z, atoms = Utils.read_from_xyz_file(spath)
+
+        if z_relative:
+            z_max = np.max(Z)
+            z_min = np.min(Z)
+
+            path = spath.parent.joinpath("max_min_coordinates.txt")
+
+            x = np.loadtxt(str(path))
+
+            x_max = x[0][0]
+            x_min = x[1][0]
+
+            y_max = x[0][1]
+            y_min = x[1][1]
+
+            resolution = round(
+                4
+                * (
+                    5
+                    + np.max(
+                        [np.abs(x_max), np.abs(x_min), np.abs(y_max), np.abs(y_min)]
+                    )
+                )
+            )
+        else:
+            path = spath.parent.joinpath("max_min_coordinates.txt")
+
+            x = np.loadtxt(str(path))
+
+            x_max = x[0][0]
+            x_min = x[1][0]
+
+            y_max = x[0][1]
+            y_min = x[1][1]
+
+            z_max = x[0][2]
+            z_min = x[1][2]
+
+            resolution = round(
+                4
+                * (
+                    5
+                    + np.max(
+                        [np.abs(x_max), np.abs(x_min), np.abs(y_max), np.abs(y_min)]
+                    )
+                )
+            )
+
+        M = np.zeros((resolution, resolution))
+
+        z_norm = lambda x: (x - z_min) / (z_max - z_min)
+
+        C_only = True
+
+        count = 0
+
+        for i in range(len(X)):
+            x_coord = int(round(X[i] * 2) + resolution / 2)
+            y_coord = int(round(Y[i] * 2) + resolution / 2)
+            if M[y_coord, x_coord] < z_norm(Z[i]):
+                M[y_coord, x_coord] = z_norm(Z[i])
+
+        name = spath.stem
+
+        Matrix = (M * 255.0).astype(np.uint8)
+        # Matrix = np.flip(Matrix, 0)
+
+        image = Image.fromarray(Matrix)
+        Utils.crop_image(image, name + ".png", dpath)
+
+        return count
 
     @staticmethod
     def dataset_max_and_min(spath: Path, dpath: Path = None) -> list:
@@ -243,7 +378,7 @@ class Utils:
         with open(str(spath), "r") as f:
             for line in f:
                 l = line.split()
-                if len(l) == 4:
+                if len(l) == 4 or len(l) == 5:
                     X.append(float(l[1]))
                     Y.append(float(l[2]))
                     Z.append(float(l[3]))
@@ -256,121 +391,6 @@ class Utils:
         min = [np.min(X), np.min(Y), np.min(Z)]
 
         return max, min
-
-    # @staticmethod
-    # def train_val_test_split_png( #!DEPRECATED
-    #     spath: Path,
-    #     dpath: Path,
-    #     csv: Path,
-    #     features: list,
-    #     split: float = 0.7,
-    #     val_split: float = 0.15,
-    #     shuffle: bool = False,
-    # ):
-    #     """Split a dataset in test and train and generate the respective CSV files"""
-
-    #     train_path = dpath.joinpath("train")
-    #     test_path = dpath.joinpath("test")
-    #     val_path = dpath.joinpath("val")
-
-    #     train_path.mkdir(parents=True, exist_ok=True)
-    #     test_path.mkdir(parents=True, exist_ok=True)
-    #     val_path.mkdir(parents=True, exist_ok=True)
-
-    #     data = pd.read_csv(csv)
-    #     n_items = len(data.index)
-
-    #     n_train = round(split * n_items)
-    #     n_val = round(val_split * n_items)
-    #     n_test = n_items - n_train - n_val
-
-    #     print(
-    #         f"Train items = {n_train}, Validation items = {n_val}, Test items = {n_test}\n"
-    #     )
-
-    #     if shuffle:
-    #         indices = random.sample(range(n_items), n_items)
-
-    #     # Start moving train sample
-
-    #     pbar = tqdm(total=n_train)
-    #     for i in range(n_train):
-    #         file = (
-    #             data["file_name"][i] + ".png"
-    #             if not shuffle
-    #             else data["file_name"][indices[i]] + ".png"
-    #         )
-    #         shutil.copy(spath.joinpath(file), train_path.joinpath(file))
-    #         pbar.update(1)
-    #     pbar.close()
-
-    #     train_csv = (
-    #         data.loc[0:(n_train), features]
-    #         if not shuffle
-    #         else data.loc[data.index[indices[0:(n_train)]], features]
-    #     )
-    #     train_csv.to_csv(train_path.joinpath("train.csv"))
-
-    #     print("Train files moved\n")
-
-    #     # Start moving validation sample
-
-    #     pbar = tqdm(total=n_val)
-    #     for i in range(n_val):
-    #         file = (
-    #             data["file_name"][i + n_train] + ".png"
-    #             if not shuffle
-    #             else data["file_name"][indices[i + n_train]] + ".png"
-    #         )
-    #         shutil.copy(spath.joinpath(file), val_path.joinpath(file))
-    #         pbar.update(1)
-    #     pbar.close()
-
-    #     val_csv = (
-    #         data.loc[(n_train) : (n_train + n_val), features]
-    #         if not shuffle
-    #         else data.loc[data.index[indices[(n_train) : (n_train + n_val)]], features]
-    #     )
-    #     val_csv.to_csv(val_path.joinpath("val.csv"))
-
-    #     print("Validation files moved\n")
-
-    #     # Start moving test sample
-
-    #     pbar = tqdm(total=n_test)
-    #     for i in range(n_test):
-    #         file = (
-    #             data["file_name"][i + n_train + n_val] + ".png"
-    #             if not shuffle
-    #             else data["file_name"][indices[i + n_train + n_val]] + ".png"
-    #         )
-    #         shutil.copy(spath.joinpath(file), test_path.joinpath(file))
-    #         pbar.update(1)
-    #     pbar.close()
-
-    #     test_csv = (
-    #         data.loc[(n_train + n_val) : (n_items + 1), features]
-    #         if not shuffle
-    #         else data.loc[
-    #             data.index[indices[(n_train + n_val) : (n_items + 1)]], features
-    #         ]
-    #     )
-    #     test_csv.to_csv(test_path.joinpath("test.csv"))
-
-    #     shutil.copy(
-    #         csv,
-    #         dpath.joinpath("dataset.csv"),
-    #     )
-
-    #     # try:
-    #     #     shutil.copy(
-    #     #         csv.parent.joinpath("max_min_coordinates.txt"), #! non mi serve questa parte
-    #     #         dpath.joinpath("max_min_coordinates.txt"),
-    #     #     )
-    #     # except:
-    #     #     pass
-
-    #     print("Test files moved\n")
 
     @staticmethod
     def train_val_test_split_png(
@@ -450,78 +470,6 @@ class Utils:
         df.to_csv(dpath.joinpath("dataset.csv"))
 
     @staticmethod
-    def stratified_train_val_test_split_png(
-        spath: Path,
-        dpath: Path,
-        csv: Path,
-        features: list,
-        target_focus: str,
-        split: float = 0.7,
-        val_split: float = 0.15,
-    ):
-        """Split a dataset in test and train and generate the respective CSV files"""
-
-        print("Stratified split...")
-
-        train_path = dpath.joinpath("train")
-        test_path = dpath.joinpath("test")
-        val_path = dpath.joinpath("val")
-
-        train_path.mkdir(parents=True, exist_ok=True)
-        test_path.mkdir(parents=True, exist_ok=True)
-        val_path.mkdir(parents=True, exist_ok=True)
-
-        train_csv, val_csv, test_csv = Utils.stratified_split(
-            csv_path=csv, target=target_focus, split=[split, val_split, val_split]
-        )
-
-        # Start moving train sample
-        names = train_csv["file_name"].tolist()
-
-        for name in tqdm(names):
-            shutil.copy(
-                spath.joinpath(name + ".png"), train_path.joinpath(name + ".png")
-            )
-        train_csv = train_csv.loc[:, features]
-        train_csv.to_csv(train_path.joinpath("train.csv"))
-        print("Train files moved\n")
-
-        # Start moving validation sample
-        names = val_csv["file_name"].tolist()
-
-        for name in tqdm(names):
-            shutil.copy(spath.joinpath(name + ".png"), val_path.joinpath(name + ".png"))
-        val_csv = val_csv.loc[:, features]
-        val_csv.to_csv(val_path.joinpath("val.csv"))
-        print("Validation files moved\n")
-
-        # Start moving test sample
-        names = test_csv["file_name"].tolist()
-
-        for name in tqdm(names):
-            shutil.copy(
-                spath.joinpath(name + ".png"), test_path.joinpath(name + ".png")
-            )
-        test_csv = test_csv.loc[:, features]
-        test_csv.to_csv(test_path.joinpath("test.csv"))
-        print("Test files moved\n")
-
-        shutil.copy(
-            csv,
-            dpath.joinpath("dataset.csv"),
-        )
-
-        # try:
-        #     shutil.copy(
-        #         csv.parent.joinpath("max_min_coordinates.txt"), #! non mi serve questa parte
-        #         dpath.joinpath("max_min_coordinates.txt"),
-        #     )
-        # except:
-        #     pass
-
-        print("Test files moved\n")
-
-    @staticmethod
     def find_max_dimensions_png_folder(spath: Path, dpath: Path = None):
         """Find the maximum dimensions in a folder of images"""
         heights = []
@@ -546,7 +494,6 @@ class Utils:
 
     @staticmethod
     def padding_image(image, size=160):
-
         h = image.shape[0]
         w = image.shape[1]
 
@@ -564,7 +511,6 @@ class Utils:
 
     @staticmethod
     def build_csv_from_png_files(spath: Path, targets: list = ["total_energy"]):
-
         train_path = spath.joinpath("train")
         test_path = spath.joinpath("test")
         val_path = spath.joinpath("val")
@@ -635,7 +581,6 @@ class Utils:
 
     @staticmethod
     def find_num_workers(dataset):
-
         seconds = []
         workers = []
 
@@ -662,7 +607,6 @@ class Utils:
 
     @staticmethod
     def plot_distribution(spath: Path, csv: Path, features: list, dpath: Path):
-
         dpath.mkdir(parents=True, exist_ok=True)
 
         sns.set_style("white")
@@ -680,7 +624,6 @@ class Utils:
                     indices.append(index[0])
 
         for i in range(len(features)):
-
             x = df[features[i]][indices]
 
             # Plot
@@ -696,7 +639,6 @@ class Utils:
 
     @staticmethod
     def date_and_time() -> str:
-
         now = datetime.now()
         dt_string = now.strftime("%d/%m/%Y %H:%M:%S")
 
@@ -762,7 +704,6 @@ class Utils:
 
     @staticmethod
     def compute_lambda_boxcox(csv_path: Path, target: str):
-
         df = pd.read_csv(csv_path)
 
         target_values = df[target].to_numpy()
@@ -801,9 +742,7 @@ class Utils:
 
         for dir in ["train", "val", "test"]:
             for file in tqdm(dataset_path.joinpath(dir).iterdir()):
-
                 if file.suffix == format:
-
                     X, Y, Z, atoms = Utils.read_from_xyz_file(
                         xyz_path.joinpath(file.stem + ".xyz")
                     )
@@ -818,7 +757,6 @@ class Utils:
 
                     lines = []
                     with open(dataset_path.joinpath(dir, file.stem + ".txt"), "w") as f:
-
                         lines.append(f"{n_C}\n") if n_C > 0 else None
                         lines.append(f"{n_O}\n") if n_O > 0 else None
                         lines.append(f"{n_H}\n") if n_H > 0 else None
@@ -828,14 +766,15 @@ class Utils:
         if info_max_atoms:
             lines.clear()
             with open(dataset_path.joinpath("flake_max_atoms.txt"), "w") as f:
-
                 lines.append(f"Flake Name = {flake_max_atoms}\n")
                 lines.append(f"Max Atoms = {max_atoms}\n")
 
                 f.writelines(lines)
 
     @staticmethod
-    def plot_fit(y: list, y_hat: list, dpath: Path, target: str):
+    def plot_fit(
+        y: list, y_hat: list, dpath: Path, target: str, colormap: str = "plasma"
+    ):
         def r2_score(y_pred, y_true):
             y_pred = np.array(y_pred)
             y_true = np.array(y_true)
@@ -847,22 +786,45 @@ class Utils:
         min = np.min([np.min(y), np.min(y_hat)])
         max = np.max([np.max(y), np.max(y_hat)])
 
+        MAEs = np.abs(np.array(y_hat) - np.array(y)) / np.abs(np.array(y))
+
         plt.figure(figsize=(10, 7))
         plt.plot(
             [min, max],
             [min, max],
         )
-        plt.scatter(y_hat, y, color="red")
+        plt.scatter(y_hat, y, c=MAEs, cmap=plt.cm.get_cmap(colormap))
+        cbar = plt.colorbar()
+        cbar.set_label("Color Values")
         plt.xlabel("Predictions")
         plt.ylabel("Targets")
         plt.title(f"{target} - R2 = {r2_score(y_hat,y):.3f}")
         plt.savefig(str(dpath))
 
     @staticmethod
+    def write_csv_results(
+        y: list,
+        y_hat: list,
+        names: list,
+        dpath: Path,
+        target: str,
+    ):
+        df = pd.DataFrame()
+        df["file_name"] = names
+        df[f"{target}_real"] = y
+        df[f"{target}_predicted"] = y_hat
+        df[f"{target}_MAE"] = (
+            np.abs(np.array(y_hat) - np.array(y)) / np.abs(np.array(y)) * 100.0
+        )
+
+        df = df.sort_values(by=f"{target}_MAE", ascending=False)
+
+        df.to_csv(dpath)
+
+    @staticmethod
     def drop_custom(
         df: pd.DataFrame,
     ):
-
         print("Dropping outliers from the dataset...\n")
 
         # el_aff_down = df.index[df["electron_affinity"] <= -7].tolist()
@@ -898,7 +860,6 @@ class Utils:
             "Fermi_energy",
         ],
     ) -> pd.DataFrame:
-
         MAX, MIN = OxygenUtils.find_max_min_distribution(csv_path, xyz_path, targets)
 
         df = pd.read_csv(str(csv_path))
@@ -911,7 +872,6 @@ class Utils:
         d = []
 
         for file in tqdm(names):
-
             X, Y, Z, atoms = Utils.read_from_xyz_file(xyz_path.joinpath(file + ".xyz"))
 
             distribution.clear()
@@ -954,7 +914,7 @@ class Utils:
         for t in targets:
             idx = df.index[df[t] == 0.0].tolist()
             indices = [*indices, *idx]
-        df = df.drop(indices, axis=0)
+        df.drop(indices, axis=0, inplace=True)
 
         return df
 
@@ -974,7 +934,6 @@ class Utils:
         drop_custom: bool = False,
         min_num_atoms: int | list = None,
     ):
-
         targets = ["file_name", *targets]
 
         dpath.mkdir(parents=True, exist_ok=True)
@@ -983,7 +942,6 @@ class Utils:
             oxygen_distribution_threshold is None
             or oxygen_distribution_threshold == 0.0
         ):
-
             df = pd.read_csv(xyz_path.joinpath("dataset.csv"))
 
             df = Utils.drop_nan_and_zeros(df)
@@ -1020,7 +978,6 @@ class Utils:
             df.to_csv(dpath.joinpath("dataset.csv"))
 
         else:
-
             df = Utils.drop_by_oxygen_distribution(
                 csv_path=xyz_path.joinpath("dataset.csv"),
                 xyz_path=xyz_path,
@@ -1059,7 +1016,6 @@ class Utils:
 
     @staticmethod
     def drop_min_num_atoms(df: pd.DataFrame, min_num_atoms: int | list):
-
         print("Dropping outliers from the dataset...\n")
 
         if isinstance(min_num_atoms, int):
@@ -1323,7 +1279,6 @@ class CoulombUtils:
 
     @staticmethod
     def generate_coulomb_matrices(spath: Path, dpath: Path, fast: False):
-
         dpath.mkdir(parents=True, exist_ok=True)
 
         items = [f for f in spath.iterdir() if f.suffix == ".xyz"]
@@ -1340,7 +1295,6 @@ class CoulombUtils:
 
     @staticmethod
     def restore_symmetric_matrix(matrix: np.array):
-
         # Reconstruct the symmetric matrix
         symmetric_matrix = matrix - np.transpose(matrix)
 
@@ -1391,7 +1345,6 @@ class OxygenUtils:
             "Fermi_energy",
         ],
     ) -> np.array:
-
         MAX, MIN = OxygenUtils.find_max_min_distribution(csv_path, xyz_path)
 
         df = pd.read_csv(str(csv_path))
@@ -1408,7 +1361,6 @@ class OxygenUtils:
         distribution_means = []
 
         for name in tqdm(names):
-
             distribution_means.append(
                 OxygenUtils.compute_mean_oxygen_distance(
                     xyz_path.joinpath(name + ".xyz")
@@ -1417,131 +1369,6 @@ class OxygenUtils:
 
         df["distribution_mean"] = distribution_means
         df.to_csv(csv_path.with_stem("distribution_mean"))
-
-    # @staticmethod
-    # def get_oxygen_distribution_means( #! DEPRECATED
-    #     csv_path: Path, xyz_path: Path, dpath: Path = None
-    # ) -> np.array:
-
-    #     MAX, MIN = OxygenUtils.find_max_min_distribution(csv_path, xyz_path)
-
-    #     df = pd.read_csv(str(csv_path))
-    #     names = df["file_name"].tolist()
-
-    #     distribution_means = []
-    #     distribution = []
-    #     d = []
-
-    #     for f in tqdm(range(len(names))):
-
-    #         X, Y, Z, atoms = Utils.read_from_xyz_file(
-    #             xyz_path.joinpath(names[f] + ".xyz")
-    #         )
-
-    #         distribution.clear()
-
-    #         for i in range(len(X)):
-    #             if atoms[i] == "O":
-    #                 d.clear()
-    #                 for j in range(len(X)):
-    #                     if atoms[j] == "O" and i != j:
-    #                         P1 = [X[i], Y[i]]
-    #                         P2 = [X[j], Y[j]]
-    #                         d.append(math.dist(P1, P2))
-
-    #                 distribution.append((np.mean(d) - MIN) / (MAX - MIN))
-
-    #         distribution_means.append(np.mean(distribution))
-
-    #         if dpath is not None:
-    #             plt.hist(
-    #                 distribution,
-    #                 bins=[0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9],
-    #             )
-
-    #             # Add labels and title
-    #             plt.xlabel("Data")
-    #             plt.ylabel("Frequency")
-    #             plt.title("Histogram of Data")
-
-    #             # Show the plot
-    #             plt.savefig(dpath.joinpath("distributions", names[f] + ".png"))
-    #             plt.close()
-
-    #             hist_data = np.histogram(
-    #                 distribution,
-    #                 bins=[0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9],
-    #             )
-    #             np.savetxt(
-    #                 str(
-    #                     dpath.joinpath("distributions", f"{names[f]}_distribution.txt")
-    #                 ),
-    #                 hist_data[
-    #                     0
-    #                 ],  # TODO va normalizzata prima di salvarla, capire che normalizzazione devo fare
-    #             )
-
-    #     if dpath is not None:
-    #         np.savetxt(
-    #             str(dpath.joinpath("distribution_means.txt")),
-    #             np.array(distribution_means),
-    #         )
-
-    #     return distribution_means
-
-    # @staticmethod
-    # def find_max_min_distribution(
-    #     csv_path: Path,
-    #     xyz_path: Path,
-    #     targets: list = [
-    #         "electronegativity",
-    #         "total_energy",
-    #         "electron_affinity",
-    #         "ionization_potential",
-    #         "Fermi_energy",
-    #     ],
-    # ):
-    #     print("Finding MAX and MIN value of the oxygen distribution...\n")
-    #     df = pd.read_csv(str(csv_path))
-    #     df = df.dropna(subset=targets)
-
-    #     indices = []
-    #     for t in targets:
-    #         idx = df.index[df[t] == 0.0].tolist()
-    #         indices = [*indices, *idx]
-    #     df = df.drop(indices, axis=0)
-
-    #     names = df["file_name"].tolist()
-
-    #     max_distribution = []
-    #     min_distribution = []
-
-    #     distribution = []
-    #     d = []
-
-    #     for f in range(len(names)):
-
-    #         X, Y, Z, atoms = Utils.read_from_xyz_file(
-    #             xyz_path.joinpath(names[f] + ".xyz")
-    #         )
-
-    #         distribution.clear()
-
-    #         for i in range(len(X)):
-    #             if atoms[i] == "O":
-    #                 d.clear()
-    #                 for j in range(len(X)):
-    #                     if atoms[j] == "O" and i != j:
-    #                         P1 = [X[i], Y[i]]
-    #                         P2 = [X[j], Y[j]]
-    #                         d.append(math.dist(P1, P2))
-
-    #                 distribution.append(np.mean(d))
-
-    #         max_distribution.append(np.max(distribution))
-    #         min_distribution.append(np.min(distribution))
-
-    #     return np.max(max_distribution), np.min(min_distribution)
 
     @staticmethod
     def compute_correlation(
@@ -1640,7 +1467,6 @@ class OxygenUtils:
 
     @staticmethod
     def copy_distributions(dataset_path: Path, distribution_path: Path):
-
         train_path = dataset_path.joinpath("train")
         val_path = dataset_path.joinpath("val")
         test_path = dataset_path.joinpath("test")
@@ -1669,58 +1495,4 @@ class OxygenUtils:
 
 
 if __name__ == "__main__":
-    # Utils.drop_outliers(
-    #     spath=Path("/home/cnrismn/git_workspace/Chemception/data/xyz_files_opt"),
-    #     dpath=Path(__file__).parent.parent.joinpath("data_GO", "filtered_xyz"),
-    # )
-    # Utils.create_subset_xyz(
-    #     xyz_path=Path(__file__).parent.parent.joinpath("data_GO", "filtered_xyz"),
-    #     dpath=Path(__file__).parent.parent.joinpath("data_GO", "subset_xyz"),
-    #     n_items=7000,
-    #     targets=[
-    #         "total_energy",
-    #         "ionization_potential",
-    #         "electronegativity",
-    #         "electron_affinity",
-    #         "band_gap",
-    #         "Fermi_energy",
-    #     ],
-    # )
-    # Utils.find_max_dimensions_png_folder(
-    #     spath=Path(__file__).parent.parent.joinpath("data_GO", "subset_png"),
-    #     dpath=Path(__file__).parent.parent.joinpath("data_GO", "training_dataset"),
-    # )
-    # Utils.drop_custom(
-    #     spath=Path("/home/cnrismn/git_workspace/Chemception/data/xyz_files_opt"),
-    #     dpath=Path(__file__).parent.parent.joinpath("data_GO", "custom_xyz"),
-    # )
-    # CoulombUtils.generate_coulomb_matrices(
-    #     spath=Path(__file__).parent.parent.joinpath("data_GO", "custom_subset_xyz"),
-    #     dpath=Path(__file__).parent.parent.joinpath("data_GO", "custom_coulomb"),
-    #     fast=True,
-    # )
-    # OxygenUtils.get_oxygen_distribution_means(
-    #     csv_path=Path(
-    #         "/home/cnrismn/git_workspace/Chemception/data/xyz_files_opt/dataset.csv"
-    #     ),
-    #     xyz_path=Path("/home/cnrismn/git_workspace/Chemception/data/xyz_files_opt"),
-    #     dpath=Path(__file__).parent.parent.joinpath("tests", "oxygens"),
-    # )
-    # OxygenUtils.compute_correlation(
-    #     csv_path=Path(
-    #         "/home/cnrismn/git_workspace/Chemception/data/xyz_files_opt/dataset.csv"
-    #     ),
-    #     distribution_path=Path(__file__).parent.parent.joinpath(
-    #         "tests", "oxygens", "distribution_means.txt"
-    #     ),
-    #     dpath=Path(__file__).parent.parent.joinpath("tests", "oxygens", "results"),
-    # )
-    # OxygenUtils.copy_distributions(
-    #     dataset_path=Path(__file__).parent.parent.joinpath(
-    #         "data_GO", "custom_training_dataset"
-    #     ),
-    #     distribution_path=Path(__file__).parent.parent.joinpath(
-    #         "tests", "oxygens", "distributions"
-    #     ),
-    # )
     pass

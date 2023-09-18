@@ -1,10 +1,10 @@
-package_path: "/home/cnrismn/git_workspace/GrapheNet"
-data_path: "${package_path}/data_GO_EA_threshold_5.7"
-stock_csv_path: "/home/cnrismn/git_workspace/Chemception/data/xyz_files_opt/dataset_complete.csv"
+package_path: "/home/tommaso/git_workspace/GrapheNet"
+data_path: "${package_path}/data_GO"
+stock_csv_path: "/home/tommaso/xyz_files_GO/dataset_with_formation_energy.csv"
 path_xyz: "${data_path}/xyz_files/"
 path_csv: "${path_xyz}/dataset.csv"
 spath: "${data_path}/png_files"
-dpath: "${data_path}/training_dataset/"
+dpath: "${data_path}/training_dataset_reference/"
 plot_distributions: True
 features:
   [
@@ -12,9 +12,9 @@ features:
     "electron_affinity",
     "electronegativity",
     "Fermi_energy",
-    "total_energy",
+    "formation_energy",
   ]
-target: None
+augmented: false
 
 randomly:
   n_items: 7000
@@ -27,5 +27,4 @@ randomly:
   drop_custom: True
 
 from_csv:
-  flag: False
-  csv_dataset_path: ""
+  csv_dataset_path: "/home/tommaso/git_workspace/GrapheNet/data_GO/training_dataset/dataset.csv"
