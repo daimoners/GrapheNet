@@ -6,6 +6,7 @@ try:
     from pathlib import Path
     import random
     import cv2
+    import numpy as np
 
 except Exception as e:
     print("Some module are missing {}".format(e))
@@ -215,7 +216,7 @@ class DatasetGenerator(object):
                     elif angle == 3:
                         rotated_image = cv2.rotate(img, cv2.ROTATE_180)
 
-                    cropped_image = Utils.crop_image(rotated_image)
+                    cropped_image = np.array(Utils.crop_image(rotated_image))
 
                     # Save the rotated image
                     cv2.imwrite(

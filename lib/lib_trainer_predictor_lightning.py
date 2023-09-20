@@ -7,6 +7,7 @@ try:
     import pandas as pd
     from pathlib import Path
     import lightning as pl
+    from lightning import LightningModule, LightningDataModule
     from lightning.pytorch.callbacks import RichProgressBar
     from lightning.pytorch.callbacks.progress.rich_progress import RichProgressBarTheme
     import numpy as np
@@ -26,7 +27,7 @@ except Exception as e:
     print(f"Some module are missing from {__file__}: {e}\n")
 
 
-class MyRegressor(pl.LightningModule):
+class MyRegressor(LightningModule):
     def __init__(self, cfg, config=None):
         super(MyRegressor, self).__init__()
 
@@ -279,7 +280,7 @@ class MyRegressor(pl.LightningModule):
         return progress_bar
 
 
-class MyDataloader(pl.LightningDataModule):
+class MyDataloader(LightningDataModule):
     def __init__(self, cfg, config=None):
         super().__init__()
         self.spath = cfg.train.spath

@@ -87,7 +87,7 @@ def main(cfg):
         filename="best_loss_{val_loss:.5f}_{epoch}",
     )
     early_stopping = EarlyStopping(
-        monitor="val_loss", patience=35, verbose=True, check_on_train_epoch_end=False
+        monitor="val_loss", patience=45, verbose=True, check_on_train_epoch_end=False
     )
 
     dataloaders = MyDataloader(cfg)

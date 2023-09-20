@@ -4,25 +4,22 @@ cluster_num_workers: 8
 coulomb: false
 deterministic: true
 enlargement_method: padding
-logger:
-  project_name: graphenet
-  user: tommaso-forni
 num_workers: 6
 package_path: /home/tommaso/git_workspace/GrapheNet
 resolution: 160
 sample: /home/tommaso/git_workspace/GrapheNet/dftb/neutral_1021/neutral_1021.png
-target: ionization_potential
+target: formation_energy
 train:
-  base_lr: 0.0
+  base_lr: 0.3
   batch_size: 32
-  compile: false
+  compile: true
   dpath: ${train.spath}/models/${target}
   lr_list:
     Fermi_energy: 0.09653253233375945
     electron_affinity: 0.061813296683228255
     electronegativity: 0.04048360377132749
-    formation_energy: 0.06
+    formation_energy: 0.3
     ionization_potential: 0.02133368544635407
-  matmul_precision: ""
+  matmul_precision: high
   num_epochs: 150
   spath: ${package_path}/data_GO/training_dataset_reference

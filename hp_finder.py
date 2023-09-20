@@ -1,6 +1,6 @@
 try:
-
-    from pytorch_lightning.loggers import TensorBoardLogger
+    from lightning.pytorch.loggers import TensorBoardLogger
+    import ray
     from ray import tune
     from ray.tune import CLIReporter
     from ray.tune.schedulers import ASHAScheduler, PopulationBasedTraining
@@ -10,18 +10,18 @@ try:
     )
     from lib.lib_trainer_predictor_lightning import MyRegressor, MyDataloader
     from lib.lib_utils import Utils
-    from pytorch_lightning import Trainer
+    from lightning import Trainer, seed_everything
     import shutil
     import hydra
     from ray.tune.search.optuna import OptunaSearch
-    from pytorch_lightning import Trainer, seed_everything
     import yaml
     from pathlib import Path
     import time
     import subprocess
+    from telegram_bot import send_message
+    import torch
 
 except Exception as e:
-
     print("Some module are missing {}".format(e))
 
 
@@ -33,10 +33,9 @@ def main(cfg):
         config,
         num_epochs=10,
     ):
-        dataloaders = MyDataloader(
-            cfg
-        )  #! ho rimosso config perchè non mi serve il batch size
+        dataloaders = MyDataloader(cfg)
         model = MyRegressor(cfg, config)
+        compiled_model = torch.compile(model)
         if cfg.cluster:
             trainer = Trainer(
                 deterministic=cfg.deterministic,
@@ -44,10 +43,12 @@ def main(cfg):
                 # If fractional GPUs passed in, convert to int.
                 accelerator="gpu",
                 num_nodes=1,
-                devices=2,
-                strategy="ddp",
+                devices=1,
+                # strategy="ddp",
                 logger=TensorBoardLogger(
-                    save_dir=tune.get_trial_dir(), name="", version="."
+                    save_dir=ray.train.get_context().get_trial_dir(),
+                    name="",
+                    version=".",
                 ),
                 callbacks=[
                     TuneReportCallback(
@@ -65,7 +66,9 @@ def main(cfg):
                 accelerator="gpu",
                 devices=1,
                 logger=TensorBoardLogger(
-                    save_dir=tune.get_trial_dir(), name="", version="."
+                    save_dir=ray.train.get_context().get_trial_dir(),
+                    name="",
+                    version=".",
                 ),
                 callbacks=[
                     TuneReportCallback(
@@ -75,7 +78,7 @@ def main(cfg):
                 ],
                 enable_progress_bar=False,
             )
-        trainer.fit(model, dataloaders)
+        trainer.fit(compiled_model, dataloaders)
 
     def tune_model_asha(
         num_samples=20,
@@ -139,6 +142,10 @@ def main(cfg):
             target_key="base_lr",
             new_value=analysis.best_config["lr"],
         )
+
+        best_lr = analysis.best_config["lr"]
+        message = f"OPtimization of target `{cfg.target}` completed ✅:\n🔺 Learning Rate \\= `{best_lr:.5f}%`"
+        send_message(message, parse_mode="MarkdownV2")
 
     if Path.home().joinpath("ray_results", f"{cfg.target}_tune_asha").is_dir():
         shutil.rmtree(
