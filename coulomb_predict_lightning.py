@@ -23,7 +23,9 @@ def get_checkpoint_name(checkpoints_path: Path):
     return str(best_loss[0])
 
 
-@hydra.main(version_base="1.2", config_path="config", config_name="train_predict")
+@hydra.main(
+    version_base="1.2", config_path="config", config_name="train_predict_coulomb"
+)
 def main(cfg):
     if cfg.train.matmul_precision == "high":
         torch.set_float32_matmul_precision("high")

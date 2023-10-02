@@ -13,14 +13,11 @@ try:
     import numpy as np
     from lib.lib_networks import (
         InceptionResNet,
-        # MyDatasetPng,
-        # MyDatasetPngCluster,
         MySimpleNet,
         MySimpleResNet,
         DeepCNN,
-        MyDatasetCoulombCluster,
-        NewMyDatasetPng,
-        NewMyDatasetCoulomb,
+        MyDatasetPng,
+        MyDatasetCoulomb,
     )
 
 except Exception as e:
@@ -68,13 +65,38 @@ class MyRegressor(LightningModule):
         #     input_channels=self.atom_types,
         #     output_channels=(self.atom_types + 1) if self.target == "total_energy" else 1
         # )
-        self.net = InceptionResNet(
-            resolution=cfg.resolution,
-            input_channels=3 if (not self.coulomb and self.atom_types > 1) else 1,
-            output_channels=(self.atom_types + 1)
-            if self.target == "total_energy"
-            else 1,
-        )
+        # self.net = InceptionResNet(
+        #     resolution=cfg.resolution,
+        #     input_channels=3 if (not self.coulomb and self.atom_types > 1) else 1,
+        #     output_channels=(self.atom_types + 1)
+        #     if self.target == "total_energy"
+        #     else 1,
+        # )
+
+        if self.coulomb:
+            self.net = InceptionResNet(
+                resolution=cfg.resolution,
+                input_channels=3 if (not self.coulomb and self.atom_types > 1) else 1,
+                output_channels=(self.atom_types + 1)
+                if self.target == "total_energy"
+                else 1,
+                filters=[16, 32, 64],
+                dense_layers=[128, 64],
+            )
+        else:
+            self.net = InceptionResNet(
+                resolution=cfg.resolution,
+                input_channels=3 if (not self.coulomb and self.atom_types > 1) else 1,
+                output_channels=(self.atom_types + 1)
+                if self.target == "total_energy"
+                else 1,
+                filters=[
+                    16,
+                    32,
+                    64,
+                ],  #! provo anche con le immagini a usare meno layers
+                dense_layers=[128, 64],
+            )
 
         self.save_hyperparameters()
 
@@ -306,33 +328,43 @@ class MyDataloader(LightningDataModule):
         train_paths = [
             f
             for f in Path(self.spath).joinpath("train").iterdir()
-            if f.suffix == ".png"
+            if (f.suffix == ".png" or f.suffix == ".npy")
         ]
         val_paths = [
-            f for f in Path(self.spath).joinpath("val").iterdir() if f.suffix == ".png"
+            f
+            for f in Path(self.spath).joinpath("val").iterdir()
+            if (f.suffix == ".png" or f.suffix == ".npy")
         ]
         test_paths = [
-            f for f in Path(self.spath).joinpath("test").iterdir() if f.suffix == ".png"
+            f
+            for f in Path(self.spath).joinpath("test").iterdir()
+            if (f.suffix == ".png" or f.suffix == ".npy")
         ]
 
         if self.coulomb:
-            self.train_data = MyDatasetCoulombCluster(
+            self.train_data = MyDatasetCoulomb(
                 train_paths,
-                train_dataset[self.target],
+                train_dataset,
+                self.target,
                 resolution=self.resolution,
+                phase="train",
             )
-            self.val_data = MyDatasetCoulombCluster(
+            self.val_data = MyDatasetCoulomb(
                 val_paths,
-                val_dataset[self.target],
+                val_dataset,
+                self.target,
                 resolution=self.resolution,
+                phase="val",
             )
-            self.test_data = MyDatasetCoulombCluster(
+            self.test_data = MyDatasetCoulomb(
                 test_paths,
-                test_dataset[self.target],
+                test_dataset,
+                self.target,
                 resolution=self.resolution,
+                phase="test",
             )
         else:
-            self.train_data = NewMyDatasetPng(
+            self.train_data = MyDatasetPng(
                 train_paths,
                 train_dataset,
                 self.target,
@@ -340,7 +372,7 @@ class MyDataloader(LightningDataModule):
                 enlargement_method=self.enlargement_method,
                 phase="train",
             )
-            self.val_data = NewMyDatasetPng(
+            self.val_data = MyDatasetPng(
                 val_paths,
                 val_dataset,
                 self.target,
@@ -348,7 +380,7 @@ class MyDataloader(LightningDataModule):
                 enlargement_method=self.enlargement_method,
                 phase="val",
             )
-            self.test_data = NewMyDatasetPng(
+            self.test_data = MyDatasetPng(
                 test_paths,
                 test_dataset,
                 self.target,

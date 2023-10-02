@@ -1,17 +1,17 @@
 atom_types: 3
 cluster: true
 cluster_num_workers: 8
-coulomb: false
+coulomb: true
 deterministic: true
 enlargement_method: padding
 num_workers: 6
 package_path: /home/tommaso/git_workspace/GrapheNet
-resolution: 160
+resolution: 1950
 sample: /home/tommaso/git_workspace/GrapheNet/dftb/neutral_1021/neutral_1021.png
-target: formation_energy
+target: ionization_potential
 train:
-  base_lr: 0.1
-  batch_size: 32
+  base_lr: 0.02133368544635407
+  batch_size: 2
   compile: false
   dpath: ${train.spath}/models/${target}
   lr_list:
@@ -22,4 +22,4 @@ train:
     ionization_potential: 0.02133368544635407
   matmul_precision: high
   num_epochs: 150
-  spath: ${package_path}/data_GO/training_dataset_reference
+  spath: ${package_path}/Coulomb_GO/training_dataset

@@ -554,7 +554,7 @@ class DeepCNN(nn.Module):
         return out.size()[1]
 
 
-class NewMyDatasetPng:
+class MyDatasetPng:
     """Class that generate a dataset for DataLoader module, given as input the paths of the .png files and the respective labels"""
 
     def __init__(
@@ -623,7 +623,7 @@ class NewMyDatasetPng:
             )
 
 
-class NewMyDatasetCoulomb:
+class MyDatasetCoulomb:
     """Class that generate a dataset for DataLoader module, given as input the paths of the .png files and the respective labels"""
 
     def __init__(
@@ -632,18 +632,21 @@ class NewMyDatasetCoulomb:
         df,
         target,
         resolution=160,
+        phase="train",
     ):
         self.paths = paths
         self.df = df
         self.target = target
         self.resolution = resolution
 
+        self.phase = phase
+
     def __len__(self):
         return len(self.paths)
 
     def __getitem__(self, i):
         coulomb = np.load((self.paths[i]).with_suffix(".npy"))
-        coulomb = coulomb / coulomb.max()
+        coulomb = coulomb / coulomb.max()  #!forse questo non ci va
         # Create a new matrix with larger dimensions
         coulomb_padded = np.zeros((self.resolution, self.resolution))
         # Insert the original matrix into the upper left corner of the new matrix
@@ -655,171 +658,19 @@ class NewMyDatasetCoulomb:
 
         n_atoms = np.loadtxt((self.paths[i]).with_name(f"{file_name}.txt"))
 
-        return (
-            torch.from_numpy(np.expand_dims(coulomb_padded.copy(), 0)).float(),
-            torch.from_numpy(n_atoms).float(),
-            torch.from_numpy(target_value).float(),
-        )
-
-
-class MyDatasetPngCluster:  #! DEPRECATED
-    """Class that generate a dataset for DataLoader module, given as input the paths of the .png files and the respective labels"""
-
-    def __init__(
-        self,
-        paths,
-        targets,
-        resolution=160,
-        enlargement_method="padding",
-    ):
-        self.paths = paths
-        self.targets = targets
-        self.resolution = resolution
-        self.enlargement_method = enlargement_method
-
-        self.images = []
-        self.properties = []
-        self.n_atoms = []
-
-        for path, target in zip(self.paths, self.targets):
-            img = cv2.imread(str(path), -1)
-            if self.enlargement_method == "padding":
-                img = Utils.padding_image(img, size=self.resolution)
-            elif self.enlargement_method == "resize":
-                img = cv2.resize(
-                    img,
-                    (self.resolution, self.resolution),
-                    interpolation=cv2.INTER_CUBIC,
-                )
-            img = np.asarray(img, float) / 255.0
-
-            target = np.array(float(target))
-
-            n_atoms = np.loadtxt(path.with_suffix(".txt"))
-
-            if len(img.shape) == 2:
-                self.images.append(
-                    torch.from_numpy(np.expand_dims(img.copy(), 0)).float()
-                )
-                self.properties.append(torch.from_numpy(n_atoms).float())
-                self.n_atoms.append(torch.from_numpy(target).float())
-            elif len(img.shape) == 3 and img.shape[2] == 3:
-                self.images.append(
-                    torch.squeeze(
-                        torch.from_numpy(np.expand_dims(img.copy(), 0))
-                        .permute(0, 3, 1, 2)
-                        .float()
-                    )
-                )
-                self.properties.append(torch.from_numpy(n_atoms).float())
-                self.n_atoms.append(torch.from_numpy(target).float())
-            else:
-                raise Exception("Wrong dimensions for the input images\n")
-
-    def __len__(self):
-        return len(self.paths)
-
-    def __getitem__(self, i):
-        return (
-            self.images[i],
-            self.properties[i],
-            self.n_atoms[i],
-        )
-
-
-class MyDatasetCoulombCluster:  #! DEPRECATED
-    """Class that generate a dataset for DataLoader module, given as input the paths of the .png files and the respective labels"""
-
-    def __init__(
-        self,
-        paths,
-        targets,
-        resolution=160,
-    ):
-        self.paths = paths
-        self.targets = targets
-        self.resolution = resolution
-
-    def __len__(self):
-        return len(self.paths)
-
-    def __getitem__(self, i):
-        coulomb = np.load((self.paths[i]).with_suffix(".npy"))
-        coulomb = coulomb / coulomb.max()
-        # Create a new matrix with larger dimensions
-        coulomb_padded = np.zeros((self.resolution, self.resolution))
-        # Insert the original matrix into the upper left corner of the new matrix
-        coulomb_padded[: coulomb.shape[0], : coulomb.shape[1]] = coulomb
-
-        target = np.array(float(self.targets[i]))
-
-        n_atoms = np.loadtxt((self.paths[i]).with_suffix(".txt"))
-
-        return (
-            torch.from_numpy(np.expand_dims(coulomb_padded.copy(), 0)).float(),
-            torch.from_numpy(n_atoms).float(),
-            torch.from_numpy(target).float(),
-        )
-
-
-class MyDatasetPngWithDistribution:  #! DEPRECATED
-    """Class that generate a dataset for DataLoader module, given as input the paths of the .png files and the respective labels"""
-
-    def __init__(
-        self,
-        paths,
-        targets,
-        resolution=160,
-        enlargement_method="padding",
-    ):
-        self.paths = paths
-        self.targets = targets
-        self.resolution = resolution
-        self.enlargement_method = enlargement_method
-
-    def __len__(self):
-        return len(self.paths)
-
-    def __getitem__(self, i):
-        img = cv2.imread(str(self.paths[i]), -1)
-        if self.enlargement_method == "padding":
-            img = Utils.padding_image(img, size=self.resolution)
-        elif self.enlargement_method == "resize":
-            img = cv2.resize(
-                img, (self.resolution, self.resolution), interpolation=cv2.INTER_CUBIC
-            )
-        img = np.asarray(img, float) / 255.0
-
-        target = np.array(float(self.targets[i]))
-
-        n_atoms = np.loadtxt((self.paths[i]).with_suffix(".txt"))
-
-        distribution = np.loadtxt(
-            (self.paths[i]).with_name(f"{(self.paths[i]).stem}_distribution.txt")
-        )
-        norm = np.linalg.norm(distribution)
-        distribution_normalized = distribution / norm
-
-        if len(img.shape) == 2:
+        if self.phase == "test":
             return (
-                torch.from_numpy(np.expand_dims(img.copy(), 0)).float(),
+                torch.from_numpy(np.expand_dims(coulomb_padded.copy(), 0)).float(),
                 torch.from_numpy(n_atoms).float(),
-                torch.from_numpy(target).float(),
-                torch.from_numpy(distribution_normalized).float(),
-            )
-        elif len(img.shape) == 3 and img.shape[2] == 3:
-            return (
-                torch.squeeze(
-                    torch.from_numpy(np.expand_dims(img.copy(), 0))
-                    .permute(0, 3, 1, 2)
-                    .float()
-                ),
-                torch.from_numpy(n_atoms).float(),
-                torch.from_numpy(target).float(),
-                torch.from_numpy(distribution_normalized).float(),
+                torch.from_numpy(target_value).float(),
+                file_name,
             )
         else:
-            raise Exception("Wrong dimensions for the input images\n")
+            return (
+                torch.from_numpy(np.expand_dims(coulomb_padded.copy(), 0)).float(),
+                torch.from_numpy(n_atoms).float(),
+                torch.from_numpy(target_value).float(),
+            )
 
 
 if __name__ == "__main__":

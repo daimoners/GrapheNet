@@ -4,10 +4,10 @@
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=0
-#SBATCH --time=100:00:00
-#SBATCH --job-name=train_GrapheNet
-#SBATCH --error=train.error
-#SBATCH --output=train.log
+#SBATCH --time=00:30:00
+#SBATCH --job-name=predict_GrapheNet
+#SBATCH --error=predict_coulomb.error
+#SBATCH --output=predict_coulomb.log
 #
 #---------------------------------------------------------------------------------------
 
@@ -22,8 +22,6 @@ export LD_LIBRARY_PATH=/home/tommaso/cuda/lib64${LD_LIBRARY_PATH:+:${LD_LIBRARY_
 
 #INSERT YOUR SCRIPT HERE
 
-echo $SLURM_JOB_ID > train.output
+echo $SLURM_JOB_ID > predict_coulomb.output
 
-srun python /home/tommaso/git_workspace/GrapheNet/train_lightning.py > train.output
-
-#srun python /home/tommaso/git_workspace/GrapheNet/predict_lightning.py > train.output
+srun python /home/tommaso/git_workspace/GrapheNet/coulomb_predict_lightning.py target=formation_energy > predict_coulomb.output
