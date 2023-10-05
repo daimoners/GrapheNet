@@ -105,8 +105,9 @@ def main(cfg):
             callbacks=[
                 checkpoint_callback,
                 # model.get_progressbar(),
-                early_stopping,  # TODO provare a togliere l'early stop
+                early_stopping,
             ],
+            enable_progress_bar=False,
         )
     else:
         trainer = Trainer(
@@ -126,9 +127,9 @@ def main(cfg):
     save_model_summary(cfg, model)
 
     start = time.time()
-    trainer.fit(compiled_model, dataloaders) if cfg.train.compile else trainer.fit(
-        model, dataloaders
-    )
+    trainer.fit(
+        compiled_model, datamodule=dataloaders
+    ) if cfg.train.compile else trainer.fit(model, datamodule=dataloaders)
     end = time.time()
 
     print(
@@ -137,10 +138,10 @@ def main(cfg):
 
     write_results_yaml(cfg, data={"training_time": float((end - start) / 60)})
 
-    process = subprocess.Popen(
-        ["python", str(Path(__file__).parent.joinpath("coulomb_predict_lightning.py"))]
-    )
-    process.wait()
+    # process = subprocess.Popen(
+    #     ["python", str(Path(__file__).parent.joinpath("coulomb_predict_lightning.py"))]
+    # )
+    # process.wait()
 
 
 if __name__ == "__main__":

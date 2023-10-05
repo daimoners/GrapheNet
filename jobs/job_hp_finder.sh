@@ -24,4 +24,12 @@ export LD_LIBRARY_PATH=/home/tommaso/cuda/lib64${LD_LIBRARY_PATH:+:${LD_LIBRARY_
 
 echo $SLURM_JOB_ID > hp_finder.output
 
-srun python /home/tommaso/git_workspace/GrapheNet/hp_finder.py  > hp_finder.output
+srun python /home/tommaso/git_workspace/GrapheNet/hp_finder.py target=electron_affinity > hp_finder.output
+
+srun python /home/tommaso/git_workspace/GrapheNet/hp_finder.py target=electronegativity > hp_finder.output
+
+srun python /home/tommaso/git_workspace/GrapheNet/hp_finder.py target=Fermi_energy > hp_finder.output
+
+srun python /home/tommaso/git_workspace/GrapheNet/hp_finder.py target=ionization_potential > hp_finder.output
+
+# srun python /home/tommaso/git_workspace/GrapheNet/hp_finder.py target=formation_energy > hp_finder.output

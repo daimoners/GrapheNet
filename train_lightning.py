@@ -1,7 +1,6 @@
 try:
     from lib.lib_trainer_predictor_lightning import MyRegressor, MyDataloader
     import hydra
-    from lightning import Trainer
     from lightning.pytorch.callbacks import ModelCheckpoint, EarlyStopping
     from lightning.pytorch.loggers import WandbLogger
     from lightning.pytorch.tuner import Tuner
@@ -103,8 +102,9 @@ def main(cfg):
             callbacks=[
                 checkpoint_callback,
                 # model.get_progressbar(),
-                early_stopping,  # TODO provare a togliere l'early stop
+                early_stopping,
             ],
+            enable_progress_bar=False,
         )
     else:
         trainer = Trainer(
@@ -124,9 +124,9 @@ def main(cfg):
     save_model_summary(cfg, model)
 
     start = time.time()
-    trainer.fit(compiled_model, dataloaders) if cfg.train.compile else trainer.fit(
-        model, dataloaders
-    )
+    trainer.fit(
+        compiled_model, datamodule=dataloaders
+    ) if cfg.train.compile else trainer.fit(model, datamodule=dataloaders)
     end = time.time()
 
     print(

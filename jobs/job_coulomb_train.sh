@@ -6,8 +6,6 @@
 #SBATCH --mem=0
 #SBATCH --time=72:00:00
 #SBATCH --job-name=train_GrapheNet_coulomb
-#SBATCH --error=train_coulomb_2.error
-#SBATCH --output=train_coulomb_2.log
 #
 #---------------------------------------------------------------------------------------
 
@@ -22,8 +20,6 @@ export LD_LIBRARY_PATH=/home/tommaso/cuda/lib64${LD_LIBRARY_PATH:+:${LD_LIBRARY_
 
 #INSERT YOUR SCRIPT HERE
 
-echo $SLURM_JOB_ID > train_coulomb_2.output
+srun python /home/tommaso/git_workspace/GrapheNet/coulomb_train_lightning.py
 
-srun python /home/tommaso/git_workspace/GrapheNet/coulomb_train_lightning.py target=electron_affinity train.base_lr=0.061813296683228255 > train_coulomb_2.output
-
-# srun python /home/tommaso/git_workspace/GrapheNet/coulomb_predict_lightning.py > train_coulomb.output
+# srun python /home/tommaso/git_workspace/GrapheNet/coulomb_predict_lightning.py

@@ -24,4 +24,4 @@ export LD_LIBRARY_PATH=/home/tommaso/cuda/lib64${LD_LIBRARY_PATH:+:${LD_LIBRARY_
 
 echo $SLURM_JOB_ID > predict_coulomb.output
 
-srun python /home/tommaso/git_workspace/GrapheNet/coulomb_predict_lightning.py target=formation_energy > predict_coulomb.output
+srun python /home/tommaso/git_workspace/GrapheNet/coulomb_predict_lightning.py target=ionization_potential > predict_coulomb.output

@@ -49,7 +49,7 @@ def main(cfg):
 
     trainer.test(
         model,
-        dataloaders,
+        datamodule=dataloaders,
         ckpt_path=checkpoints,
     )
     print("Maximum % error = {:.5f}%".format(np.max(model.errors)))

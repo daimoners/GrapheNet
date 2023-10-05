@@ -16,3 +16,5 @@ tests/
 *.log
 Coulomb_*/
 *.pdf
+*.out
+ray_logs/

@@ -8,18 +8,18 @@ num_workers: 6
 package_path: /home/tommaso/git_workspace/GrapheNet
 resolution: 160
 sample: /home/tommaso/git_workspace/GrapheNet/dftb/neutral_1021/neutral_1021.png
-target: formation_energy
+target: electronegativity
 train:
-  base_lr: 0.1
+  base_lr: 0.04550807817481413
   batch_size: 32
   compile: false
   dpath: ${train.spath}/models/${target}
   lr_list:
-    Fermi_energy: 0.09653253233375945
-    electron_affinity: 0.061813296683228255
-    electronegativity: 0.04048360377132749
-    formation_energy: 0.1
-    ionization_potential: 0.02133368544635407
+    Fermi_energy: 0.058841390814253124
+    electron_affinity: 0.01699161538473148
+    electronegativity: 0.04550807817481413
+    formation_energy: 0.10068164853406059
+    ionization_potential: 0.015186596128617183
   matmul_precision: high
   num_epochs: 150
-  spath: ${package_path}/data_GO/training_dataset_reference
+  spath: ${package_path}/data_GO/training_dataset_augmented

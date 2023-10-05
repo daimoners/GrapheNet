@@ -646,7 +646,7 @@ class MyDatasetCoulomb:
 
     def __getitem__(self, i):
         coulomb = np.load((self.paths[i]).with_suffix(".npy"))
-        coulomb = coulomb / coulomb.max()  #!forse questo non ci va
+        # coulomb = coulomb / coulomb.max()  #!forse questo non ci va
         # Create a new matrix with larger dimensions
         coulomb_padded = np.zeros((self.resolution, self.resolution))
         # Insert the original matrix into the upper left corner of the new matrix

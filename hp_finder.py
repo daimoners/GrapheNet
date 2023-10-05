@@ -20,6 +20,7 @@ try:
     import subprocess
     from telegram_bot import send_message
     import torch
+    import pytorch_lightning as pl
 
 except Exception as e:
     print("Some module are missing {}".format(e))
@@ -27,6 +28,13 @@ except Exception as e:
 
 @hydra.main(version_base="1.2", config_path="config", config_name="train_predict")
 def main(cfg):
+    if cfg.train.matmul_precision == "high":
+        torch.set_float32_matmul_precision("high")
+    elif cfg.train.matmul_precision == "medium":
+        torch.set_float32_matmul_precision("medium")
+
+    Path(__file__).parent.joinpath("ray_logs").mkdir(exist_ok=True, parents=True)
+
     seed_everything(42, workers=True)
 
     def train_tune(
@@ -35,9 +43,9 @@ def main(cfg):
     ):
         dataloaders = MyDataloader(cfg)
         model = MyRegressor(cfg, config)
-        compiled_model = torch.compile(model)
+
         if cfg.cluster:
-            trainer = Trainer(
+            trainer = pl.Trainer(
                 deterministic=cfg.deterministic,
                 max_epochs=num_epochs,
                 # If fractional GPUs passed in, convert to int.
@@ -46,7 +54,7 @@ def main(cfg):
                 devices=1,
                 # strategy="ddp",
                 logger=TensorBoardLogger(
-                    save_dir=ray.train.get_context().get_trial_dir(),
+                    save_dir=Path(__file__).parent.joinpath("ray_logs"),
                     name="",
                     version=".",
                 ),
@@ -59,14 +67,14 @@ def main(cfg):
                 enable_progress_bar=False,
             )
         else:
-            trainer = Trainer(
+            trainer = pl.Trainer(
                 deterministic=cfg.deterministic,
                 max_epochs=num_epochs,
                 # If fractional GPUs passed in, convert to int.
                 accelerator="gpu",
                 devices=1,
                 logger=TensorBoardLogger(
-                    save_dir=ray.train.get_context().get_trial_dir(),
+                    save_dir=Path(__file__).parent.joinpath("ray_logs"),
                     name="",
                     version=".",
                 ),
@@ -78,7 +86,7 @@ def main(cfg):
                 ],
                 enable_progress_bar=False,
             )
-        trainer.fit(compiled_model, dataloaders)
+        trainer.fit(model, datamodule=dataloaders)
 
     def tune_model_asha(
         num_samples=20,
@@ -87,7 +95,7 @@ def main(cfg):
     ):
         config = {
             "lr": tune.loguniform(
-                1e-4, 1e-1
+                1e-3, 1
             ),  # dopo aver trovato un certo range con "lr": tune.loguniform(1e-4, 1e-2) e analizzando i risultati su tensorboard, uso "lr": tune.loguniform(0.007, 0.009) sul range trovato con il range (1e-4, 1e-2)
             # "batch_size": tune.choice([16, 32]),
         }
@@ -138,13 +146,13 @@ def main(cfg):
         ) as outfile:
             yaml.dump(results, outfile)
         Utils.update_yaml(
-            spath=Path().resolve().joinpath("config", "train_predict.yaml"),
+            spath=Path(__file__).parent.joinpath("config", "train_predict.yaml"),
             target_key="base_lr",
             new_value=analysis.best_config["lr"],
         )
 
         best_lr = analysis.best_config["lr"]
-        message = f"OPtimization of target `{cfg.target}` completed ✅:\n🔺 Learning Rate \\= `{best_lr:.5f}%`"
+        message = f"Optimization of target `{cfg.target}` completed ✅:\n🔺 Learning Rate \\= `{best_lr:.5f}`"
         send_message(message, parse_mode="MarkdownV2")
 
     if Path.home().joinpath("ray_results", f"{cfg.target}_tune_asha").is_dir():
