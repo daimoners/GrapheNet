@@ -1,5 +1,4 @@
 try:
-
     from lib.lib_trainer_predictor_lightning import MyRegressor, MyDataloader
     import hydra
     from pytorch_lightning import Trainer, seed_everything
@@ -15,12 +14,10 @@ try:
     from tqdm import tqdm
 
 except Exception as e:
-
     print("Some module are missing {}".format(e))
 
 
 def get_model_names(checkpoints_path: Path):
-
     best_loss = [
         model
         for model in checkpoints_path.iterdir()
@@ -31,7 +28,6 @@ def get_model_names(checkpoints_path: Path):
 
 
 def plot_filters(model_weights, save_path: Path):
-
     filters_path = save_path.joinpath("filters")
     filters_path.mkdir(parents=True, exist_ok=True)
 
@@ -89,21 +85,20 @@ def plot_filters(model_weights, save_path: Path):
 
 
 def inception_plot_filters(model_weights, save_path: Path):
-
     filters_path = save_path.joinpath("filters")
     filters_path.mkdir(parents=True, exist_ok=True)
 
     print("Plotting filters...")
     layers = {
-        0: "conv1_32",
-        1: "conv3_32",
-        2: "conv5_32",
-        3: "conv1_64",
-        4: "conv3_64",
-        5: "conv5_64",
-        6: "conv1_128",
-        7: "conv3_128",
-        8: "conv5_128",
+        0: "conv1_16",
+        1: "conv3_16",
+        2: "conv5_16",
+        3: "conv1_32",
+        4: "conv3_32",
+        5: "conv5_32",
+        6: "conv1_64",
+        7: "conv3_64",
+        8: "conv5_64",
     }
     for k in range(0, len(model_weights)):
         plt.figure(figsize=(15, 15))
@@ -121,7 +116,6 @@ def inception_plot_filters(model_weights, save_path: Path):
 
 
 def plot_feature_maps(conv_layers, image, save_path: Path, num_filters: int = 10):
-
     print("Plotting feature maps...")
 
     # pass the image through all the layers
@@ -159,7 +153,6 @@ def plot_feature_maps(conv_layers, image, save_path: Path, num_filters: int = 10
 def inception_plot_feature_maps(
     conv_layers, image, save_path: Path, num_filters: int = 10, colormap="seismic"
 ):
-
     print("Plotting feature maps...")
 
     # pass the image through all the layers
@@ -181,15 +174,15 @@ def inception_plot_feature_maps(
     feature_maps_path.mkdir(parents=True, exist_ok=True)
 
     layers = {
-        0: "conv1_32",
-        1: "conv3_32",
-        2: "conv5_32",
-        3: "conv1_64",
-        4: "conv3_64",
-        5: "conv5_64",
-        6: "conv1_128",
-        7: "conv3_128",
-        8: "conv5_128",
+        0: "conv1_16",
+        1: "conv3_16",
+        2: "conv5_16",
+        3: "conv1_32",
+        4: "conv3_32",
+        5: "conv5_32",
+        6: "conv1_64",
+        7: "conv3_64",
+        8: "conv5_64",
     }
     # visualize "num_filters" features from each layer
     # (although there are more feature maps in the upper layers)
@@ -214,7 +207,6 @@ def inception_plot_feature_maps(
 
 
 def load_image(img_path: Path, resolution: int, enlargement_method: str = "padding"):
-
     image = cv2.imread(str(img_path), -1)
     if enlargement_method == "padding":
         image = Utils.padding_image(image, size=resolution)
@@ -301,7 +293,8 @@ def new_get_weights_and_layers(model):
 
 
 def load_model(cfg, checkpoints_path: Path):
-    checkpoints = get_model_names(checkpoints_path)
+    # checkpoints = get_model_names(checkpoints_path)
+    checkpoints = "/home/tommaso/git_workspace/GrapheNet/data_GO/training_dataset_reference/models/inceptionresnet/last_high_reduced_layers_lr_workstation_optimized/ionization_potential/best_loss_val_loss=0.01514_epoch=32.ckpt"
 
     model = MyRegressor(cfg)
     model.load_state_dict(torch.load(checkpoints)["state_dict"])
@@ -313,7 +306,6 @@ def load_model(cfg, checkpoints_path: Path):
 
 @hydra.main(version_base="1.2", config_path="config", config_name="train_predict")
 def main(cfg):
-
     seed_everything(42, workers=True)
     save_path = Path(cfg.train.spath).joinpath(
         "models", f"{cfg.target}", f"visualization_{Path(cfg.sample).stem}"
@@ -328,13 +320,13 @@ def main(cfg):
 
     image = load_image(Path(cfg.sample), cfg.resolution, cfg.enlargement_method)
 
-    prediction = make_prediction(model, image, Path(cfg.sample), target=cfg.target)
-    print(f"Predicted target: {prediction:.4f}")
-    target_value = get_target_value(
-        Path(cfg.sample).stem, cfg.target, Path(cfg.train.spath).joinpath("dataset.csv")
-    )
-    print(f"Real target: {target_value:.4f}")
-    print(f"MAE: {abs((prediction-target_value)/target_value)*100.0:.6f}%")
+    # prediction = make_prediction(model, image, Path(cfg.sample), target=cfg.target)
+    # print(f"Predicted target: {prediction:.4f}")
+    # target_value = get_target_value(
+    #     Path(cfg.sample).stem, cfg.target, Path(cfg.train.spath).joinpath("dataset.csv")
+    # )
+    # print(f"Real target: {target_value:.4f}")
+    # print(f"MAE: {abs((prediction-target_value)/target_value)*100.0:.6f}%")
 
     shutil.copy(cfg.sample, str(save_path))
     inception_plot_feature_maps(conv_layers, image, save_path, num_filters=-1)

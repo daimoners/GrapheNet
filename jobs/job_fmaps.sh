@@ -5,10 +5,8 @@
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=0
-#SBATCH --time=100:00:00
-#SBATCH --job-name=train_GrapheNet
-#SBATCH --error=train.error
-#SBATCH --output=train.log
+#SBATCH --time=00:30:00
+#SBATCH --job-name=fmaps_GrapheNet
 #
 #---------------------------------------------------------------------------------------
 
@@ -21,10 +19,5 @@ conda activate pl
 export PATH=/home/tommaso/cuda/bin${PATH:+:${PATH}}
 export LD_LIBRARY_PATH=/home/tommaso/cuda/lib64${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}
 
-#INSERT YOUR SCRIPT HERE
 
-echo $SLURM_JOB_ID > train.output
-
-srun python /home/tommaso/git_workspace/GrapheNet/train_lightning.py target=ionization_potential train.base_lr=0.015186596128617183 > train.output
-
-#srun python /home/tommaso/git_workspace/GrapheNet/predict_lightning.py > train.output
+srun python /home/tommaso/git_workspace/GrapheNet/feature_maps_generator.py

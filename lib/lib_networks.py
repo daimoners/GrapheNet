@@ -1,6 +1,7 @@
 try:
     import torch.nn as nn
     import torch
+    import torchvision.models as models
     import cv2
     import numpy as np
     from lib.lib_utils import Utils
@@ -17,6 +18,23 @@ try:
 
 except Exception as e:
     print(f"Some module are missing: {e}")
+
+
+def get_resnet_model(in_channels, out_channels):
+    resnet18 = models.resnet18()
+
+    resnet18.conv1 = nn.Conv2d(
+        in_channels, 64, kernel_size=7, stride=2, padding=3, bias=False
+    )
+
+    resnet18.fc = nn.Sequential(
+        nn.Linear(resnet18.fc.in_features, 256),
+        nn.ReLU(),
+        nn.Dropout(0.5),
+        nn.Linear(256, out_channels),
+    )
+
+    return resnet18
 
 
 class InceptionBlock(nn.Module):
@@ -646,7 +664,7 @@ class MyDatasetCoulomb:
 
     def __getitem__(self, i):
         coulomb = np.load((self.paths[i]).with_suffix(".npy"))
-        # coulomb = coulomb / coulomb.max()  #!forse questo non ci va
+        coulomb = coulomb / coulomb.max()  #!forse questo non ci va
         # Create a new matrix with larger dimensions
         coulomb_padded = np.zeros((self.resolution, self.resolution))
         # Insert the original matrix into the upper left corner of the new matrix

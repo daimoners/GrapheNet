@@ -68,7 +68,7 @@ def main(dataset_path: Path):
 
 def find_max_dims():
     path = Path(
-        "/home/cnrismn/git_workspace/GrapheNet/data_GO/training_dataset_data_augmentation/test"
+        "/home/tommaso/git_workspace/GrapheNet/data_G/training_dataset_reduced/train"
     )
     samples = [f for f in path.iterdir() if f.suffix == ".png"]
 
@@ -94,9 +94,11 @@ def find_max_dims():
 
 
 def copy_xyz_sample():
-    spath = Path("/home/cnrismn/git_workspace/GrapheNet/data_GO/training_dataset/val")
+    spath = Path(
+        "/home/tommaso/git_workspace/GrapheNet/data_G/training_dataset_reference/val"
+    )
     dpath = Path(
-        "/home/cnrismn/git_workspace/GrapheNet/data_GO/training_dataset_data_augmentation/val"
+        "/home/tommaso/git_workspace/GrapheNet/data_G/training_dataset_reduced/val"
     )
 
     samples = [f for f in spath.iterdir() if f.suffix == ".png"]
@@ -108,7 +110,7 @@ def copy_xyz_sample():
 
 def drop_from_pd():
     csv_path = Path(
-        "/home/cnrismn/git_workspace/GrapheNet/data_GO/training_dataset_data_augmentation/val/val.csv"
+        "/home/tommaso/git_workspace/GrapheNet/data_G/training_dataset_reduced/val/val.csv"
     )
 
     # create a sample dataframe
@@ -127,9 +129,22 @@ def drop_from_pd():
     df.to_csv(csv_path)
 
 
+def concatenate_ds(dataset_path: Path):
+    df1 = pd.read_csv(dataset_path.joinpath("train", "train.csv"))
+    df2 = pd.read_csv(dataset_path.joinpath("test", "test.csv"))
+    df3 = pd.read_csv(dataset_path.joinpath("val", "val.csv"))
+
+    # Concatena i tre DataFrame in uno solo
+    result = pd.concat([df1, df2, df3], ignore_index=True)
+
+    # Salva il DataFrame risultante in un nuovo file CSV
+    result.to_csv(dataset_path.joinpath("dataset.csv"), index=False)
+
+
 if __name__ == "__main__":
-    main(
-        dataset_path=Path(
-            "/home/tommaso/git_workspace/GrapheNet/data_GO/training_dataset_augmented"
-        )
-    )
+    # main(
+    #     dataset_path=Path(
+    #         "/home/tommaso/git_workspace/GrapheNet/data_GO/training_dataset_augmented"
+    #     )
+    # )
+    find_max_dims()

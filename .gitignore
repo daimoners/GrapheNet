@@ -18,3 +18,6 @@ Coulomb_*/
 *.pdf
 *.out
 ray_logs/
+featuremaps_visualization/
+paper_plots/
+UMAP/

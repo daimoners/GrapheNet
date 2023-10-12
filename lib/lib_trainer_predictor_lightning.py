@@ -18,6 +18,7 @@ try:
         DeepCNN,
         MyDatasetPng,
         MyDatasetCoulomb,
+        get_resnet_model,
     )
 
 except Exception as e:
@@ -50,8 +51,10 @@ class MyRegressor(LightningModule):
 
         # self.net = MySimpleNet(
         #     resolution=cfg.resolution,
-        #     input_channels=self.atom_types,
-        #     output_channels=(self.atom_types + 1) if self.target == "total_energy" else 1
+        #     input_channels=3 if (not self.coulomb and self.atom_types > 1) else 1,
+        #     output_channels=(self.atom_types + 1)
+        #     if self.target == "total_energy"
+        #     else 1,
         # )
         # self.net = MySimpleResNet(
         #     resolution=cfg.resolution,
@@ -65,38 +68,20 @@ class MyRegressor(LightningModule):
         #     input_channels=self.atom_types,
         #     output_channels=(self.atom_types + 1) if self.target == "total_energy" else 1
         # )
-        # self.net = InceptionResNet(
-        #     resolution=cfg.resolution,
-        #     input_channels=3 if (not self.coulomb and self.atom_types > 1) else 1,
-        #     output_channels=(self.atom_types + 1)
-        #     if self.target == "total_energy"
-        #     else 1,
-        # )
+        self.net = InceptionResNet(
+            resolution=cfg.resolution,
+            input_channels=3 if (not self.coulomb and self.atom_types > 1) else 1,
+            output_channels=(self.atom_types + 1)
+            if self.target == "total_energy"
+            else 1,
+            filters=[16, 32, 64],
+            dense_layers=[128, 64],
+        )
 
-        if self.coulomb:
-            self.net = InceptionResNet(
-                resolution=cfg.resolution,
-                input_channels=3 if (not self.coulomb and self.atom_types > 1) else 1,
-                output_channels=(self.atom_types + 1)
-                if self.target == "total_energy"
-                else 1,
-                filters=[16, 32, 64],
-                dense_layers=[128, 64],
-            )
-        else:
-            self.net = InceptionResNet(
-                resolution=cfg.resolution,
-                input_channels=3 if (not self.coulomb and self.atom_types > 1) else 1,
-                output_channels=(self.atom_types + 1)
-                if self.target == "total_energy"
-                else 1,
-                filters=[
-                    16,
-                    32,
-                    64,
-                ],  #! provo anche con le immagini a usare meno layers
-                dense_layers=[128, 64],
-            )
+        # self.net = get_resnet_model(
+        #     in_channels=3 if (not self.coulomb and self.atom_types > 1) else 1,
+        #     out_channels=(self.atom_types + 1) if self.target == "total_energy" else 1,
+        # )
 
         self.save_hyperparameters()
 

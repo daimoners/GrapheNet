@@ -206,7 +206,7 @@ class DatasetGenerator(object):
             ]
 
             for sample in tqdm(samples):
-                img = cv2.imread(str(sample))
+                img = cv2.imread(str(sample), -1)
 
                 for angle in [1, 2, 3]:
                     if angle == 1:
