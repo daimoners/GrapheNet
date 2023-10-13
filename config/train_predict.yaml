@@ -10,7 +10,7 @@ resolution: 160
 sample: /home/tommaso/git_workspace/GrapheNet/featuremaps_visualization/neutral_1021/neutral_1021.png
 target: ionization_potential
 train:
-  base_lr: 0.015186596128617183
+  base_lr: 0.0
   batch_size: 32
   compile: false
   dpath: ${train.spath}/models/${target}
@@ -22,4 +22,4 @@ train:
     ionization_potential: 0.015186596128617183
   matmul_precision: high
   num_epochs: 150
-  spath: ${package_path}/UMAP/25_clusters/cluster_4/
+  spath: ${package_path}/data_GO/training_dataset_xyz_augmented

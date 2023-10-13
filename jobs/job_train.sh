@@ -1,6 +1,5 @@
 #!/bin/bash
 #SBATCH --nodes=1
-#SBATCH --nodelist=gn02
 #SBATCH --gres=gpu:1
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=8
@@ -25,6 +24,6 @@ export LD_LIBRARY_PATH=/home/tommaso/cuda/lib64${LD_LIBRARY_PATH:+:${LD_LIBRARY_
 
 echo $SLURM_JOB_ID > train.output
 
-srun python /home/tommaso/git_workspace/GrapheNet/train_lightning.py target=ionization_potential train.base_lr=0.015186596128617183 > train.output
+srun python /home/tommaso/git_workspace/GrapheNet/train_lightning.py > train.output
 
 #srun python /home/tommaso/git_workspace/GrapheNet/predict_lightning.py > train.output

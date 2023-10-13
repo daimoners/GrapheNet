@@ -1,11 +1,10 @@
 #!/bin/bash
 #SBATCH --nodes=1
-#SBATCH --nodelist=gn02
 #SBATCH --gres=gpu:1
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=0
-#SBATCH --time=8:00:00
+#SBATCH --time=2:00:00
 #SBATCH --job-name=train_GrapheNet
 #SBATCH --error=train.error
 #SBATCH --output=train.log

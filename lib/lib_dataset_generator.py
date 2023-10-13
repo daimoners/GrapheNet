@@ -131,7 +131,11 @@ class DatasetGenerator(object):
         self.min_num_atoms = cfg.randomly.min_num_atoms
         self.drop_custom_flag = cfg.randomly.drop_custom
 
-        self.augmented = cfg.augmented
+        self.augmented_png = cfg.augmented_png
+        self.augmented_xyz = cfg.augmented_xyz
+
+        if self.augmented_xyz and self.augmented_png:
+            raise Exception("Cannot augment both xyz and png")
 
         if not self.csv_dataset_path.is_file():
             DatasetGenerator.filter_csv(
@@ -154,13 +158,15 @@ class DatasetGenerator(object):
                 dpath=self.path_xyz,
                 complete_csv_path=self.stock_dataset_path,
             )
+            if self.augmented_xyz:
+                DatasetGenerator.rotate_all_xyz(spath=self.path_xyz)
         DatasetGenerator.generate_cropped_png_dataset_from_xyz(
             spath=self.path_xyz, dpath=self.spath
         ) if not self.spath.is_dir() else None
         self.split_dataset()
         Utils.generate_num_atoms(dataset_path=self.dpath, xyz_path=self.path_xyz)
         Utils.find_max_dimensions_png_folder(spath=self.spath, dpath=self.dpath)
-        if self.augmented:
+        if self.augmented_png:
             self.data_augmentation()
         shutil.rmtree(self.spath)
         shutil.rmtree(self.path_xyz)
@@ -222,6 +228,64 @@ class DatasetGenerator(object):
                     cv2.imwrite(
                         str(sample.with_stem(sample.stem + f"_R{angle}")), cropped_image
                     )
+
+    @staticmethod
+    def rotate_xyz(spath: Path, dpath: Path, angle: float):
+        # Define the rotation function
+        def rotate_z(point_cloud, centroid, angle):
+            rot_matrix = np.array(
+                [
+                    [np.cos(angle), -np.sin(angle), 0],
+                    [np.sin(angle), np.cos(angle), 0],
+                    [0, 0, 1],
+                ]
+            )
+            return np.dot(rot_matrix, (point_cloud - centroid).T).T + centroid
+
+        # Read in the XYZ file
+        X, Y, Z, atoms = Utils.read_from_xyz_file(spath)
+
+        # Combine the coordinates and atoms into a structured array
+        xyz = np.zeros(
+            (len(X),),
+            dtype=np.dtype([("atom", "U1"), ("x", float), ("y", float), ("z", float)]),
+        )
+        xyz["atom"] = atoms
+        xyz["x"] = X
+        xyz["y"] = Y
+        xyz["z"] = Z
+
+        # Extract the x, y, and z coordinates for the rotation
+        xyz_coord = np.array([xyz["x"], xyz["y"], xyz["z"]]).T
+
+        # Calculate the centroid
+        centroid = np.mean(xyz_coord, axis=0)
+
+        # Rotate the point cloud by a variable angle
+        angle_rad = angle * np.pi / 180.0  # example angle of 45 degrees
+        xyz_coord_rotated = rotate_z(xyz_coord, centroid, angle_rad)
+
+        # Write out the new XYZ file
+        with open(dpath, "w") as f:
+            f.write(f"{len(X)}\n")
+            f.write(f"XYZ file rotated around the Z axis by {angle:.2f} degrees\n")
+            for i in range(len(X)):
+                f.write(
+                    f"{xyz[i]['atom']} {xyz_coord_rotated[i, 0]:.6f} {xyz_coord_rotated[i, 1]:.6f} {xyz_coord_rotated[i, 2]:.6f}\n"
+                )
+
+    @staticmethod
+    def rotate_all_xyz(spath: Path):
+        files = [f for f in spath.iterdir() if f.suffix.lower() == ".xyz"]
+        angles = [30, 60, 90, 120, 150, 180, 210, 240, 270, 300, 330]
+
+        for file in files:
+            for angle in random.sample(angles, 3):
+                DatasetGenerator.rotate_xyz(
+                    spath=file,
+                    dpath=file.with_stem(f"{file.stem}_R{angle}"),
+                    angle=angle,
+                )
 
 
 if __name__ == "__main__":

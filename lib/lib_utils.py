@@ -437,9 +437,13 @@ class Utils:
         train_csv = df.loc[train_indices, features]
         names = train_csv["file_name"].tolist()
         for name in tqdm(names):
-            shutil.copy(
-                spath.joinpath(name + suffix), train_path.joinpath(name + suffix)
-            )
+            samples = [
+                f
+                for f in spath.iterdir()
+                if f.stem == name or f.stem.startswith(f"{name}_R")
+            ]
+            for sample in samples:
+                shutil.copy(sample, train_path.joinpath(f"{sample.stem}{suffix}"))
         train_csv.to_csv(train_path.joinpath("train.csv"))
 
         print("Train files moved\n")
@@ -449,7 +453,13 @@ class Utils:
         val_csv = df.loc[val_indices, features]
         names = val_csv["file_name"].tolist()
         for name in tqdm(names):
-            shutil.copy(spath.joinpath(name + suffix), val_path.joinpath(name + suffix))
+            samples = [
+                f
+                for f in spath.iterdir()
+                if f.stem == name or f.stem.startswith(f"{name}_R")
+            ]
+            for sample in samples:
+                shutil.copy(sample, val_path.joinpath(f"{sample.stem}{suffix}"))
         val_csv.to_csv(val_path.joinpath("val.csv"))
 
         print("Validation files moved\n")
@@ -459,9 +469,13 @@ class Utils:
         test_csv = df.loc[test_indices, features]
         names = test_csv["file_name"].tolist()
         for name in tqdm(names):
-            shutil.copy(
-                spath.joinpath(name + suffix), test_path.joinpath(name + suffix)
-            )
+            samples = [
+                f
+                for f in spath.iterdir()
+                if f.stem == name or f.stem.startswith(f"{name}_R")
+            ]
+            for sample in samples:
+                shutil.copy(sample, test_path.joinpath(f"{sample.stem}{suffix}"))
         test_csv.to_csv(test_path.joinpath("test.csv"))
 
         print("Test files moved\n")
@@ -742,7 +756,7 @@ class Utils:
 
         for dir in ["train", "val", "test"]:
             for file in tqdm(dataset_path.joinpath(dir).iterdir()):
-                if file.suffix == format:
+                if file.suffix == format and not "_R" in file.stem:
                     X, Y, Z, atoms = Utils.read_from_xyz_file(
                         xyz_path.joinpath(file.stem + ".xyz")
                     )

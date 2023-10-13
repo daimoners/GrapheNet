@@ -4,7 +4,7 @@ stock_csv_path: "/home/tommaso/xyz_files_GO/dataset_with_formation_energy.csv"
 path_xyz: "${data_path}/xyz_files/"
 path_csv: "${path_xyz}/dataset.csv"
 spath: "${data_path}/png_files"
-dpath: "${data_path}/cluster_11/"
+dpath: "${data_path}/training_dataset_xyz_augmented_new/"
 plot_distributions: True
 features:
   [
@@ -13,9 +13,9 @@ features:
     "electronegativity",
     "Fermi_energy",
     "formation_energy",
-    "total_energy",
   ]
-augmented: false
+augmented_png: false
+augmented_xyz: true
 
 randomly:
   n_items: 7000
@@ -28,4 +28,4 @@ randomly:
   drop_custom: True
 
 from_csv:
-  csv_dataset_path: "/home/tommaso/git_workspace/GrapheNet/UMAP/25_clusters/cluster_11/training_dataset/dataset.csv"
+  csv_dataset_path: "/home/tommaso/git_workspace/GrapheNet/data_GO/training_dataset_reduced/dataset.csv"
