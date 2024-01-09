@@ -1,5 +1,4 @@
 try:
-
     import torch
     import torch.nn as nn
     import torch.optim
@@ -7,114 +6,88 @@ try:
     from torch.utils.data import DataLoader
     import pandas as pd
     from pathlib import Path
-    import pytorch_lightning as pl
-    from pytorch_lightning.callbacks import RichProgressBar
-    from pytorch_lightning.callbacks.progress.rich_progress import RichProgressBarTheme
+    import lightning as pl
+    from lightning import LightningModule, LightningDataModule
+    from lightning.pytorch.callbacks import RichProgressBar
+    from lightning.pytorch.callbacks.progress.rich_progress import RichProgressBarTheme
     import numpy as np
     from lib.lib_networks import (
         InceptionResNet,
-        MyDatasetPng,
-        MyDatasetPngCluster,
         MySimpleNet,
         MySimpleResNet,
         DeepCNN,
-        MyDatasetCoulombCluster,
-        NewMyDatasetPng,
+        MyDatasetPng,
+        MyDatasetCoulomb,
+        get_resnet_model,
     )
 
 except Exception as e:
+    print(f"Some module are missing from {__file__}: {e}\n")
 
-    print("Some module are missing {}".format(e))
 
-
-class MyRegressor(pl.LightningModule):
+class MyRegressor(LightningModule):
     def __init__(self, cfg, config=None):
         super(MyRegressor, self).__init__()
 
         self.learning_rate = cfg.train.base_lr if config is None else config["lr"]
-        self.normalize = cfg.normalize
         self.target = cfg.target
         self.atom_types = cfg.atom_types
         self.count = 0
         self.errors = []
         self.plot_y = []
         self.plot_y_hat = []
+        self.sample_names = []
         self.coulomb = cfg.coulomb
         self.num_epochs = cfg.train.num_epochs
         self.batch_size = cfg.train.batch_size
 
-        if self.normalize == "z_score":
-            mean_std = np.loadtxt(
-                str(
-                    Path(cfg.train.spath).joinpath(
-                        "train", f"mean_std_{self.target}.txt"
-                    )
-                )
-            )
-            self.mean, self.std = mean_std[0], mean_std[1]
-        elif self.normalize == "normalization":
-            min_max = np.loadtxt(
-                str(
-                    Path(cfg.train.spath).joinpath(
-                        "train", f"min_max_{self.target}.txt"
-                    )
-                )
-            )
-            self.min, self.max = min_max[0], min_max[1]
-        elif self.normalize == "log":
-            minimum = np.loadtxt(
-                str(
-                    Path(cfg.train.spath).joinpath(
-                        "train", f"minimum_{self.target}.txt"
-                    )
-                )
-            )
-            self.min = np.abs(minimum)
-        elif self.normalize == "boxcox":
-            _lambda = np.loadtxt(
-                str(
-                    Path(cfg.train.spath).joinpath("train", f"lambda_{self.target}.txt")
-                )
-            )
-            minimum = np.loadtxt(
-                str(
-                    Path(cfg.train.spath).joinpath(
-                        "train", f"minimum_{self.target}.txt"
-                    )
-                )
-            )
-            self.min = np.abs(minimum) + 1
-            self._lambda = torch.tensor(_lambda)
+        self.val_loss_step_holder = []
+        self.val_acc_step_holder = []
+        self.train_loss_step_holder = []
+        self.train_acc_step_holder = []
+        self.compiled = cfg.train.compile
 
         self.min_val_loss = float("inf")
 
         # self.net = MySimpleNet(
         #     resolution=cfg.resolution,
-        #     input_channels=self.atom_types,
-        #     output_channels=(self.atom_types + 1) if self.target == "total_energy" else 1
+        #     input_channels=3 if (not self.coulomb and self.atom_types > 1) else 1,
+        #     output_channels=(self.atom_types + 1)
+        #     if (self.target == "total_energy" or self.target == "formation_energy")
+        #     else 1,
         # )
         # self.net = MySimpleResNet(
         #     resolution=cfg.resolution,
-        #     input_channels=self.atom_types,
+        #     input_channels=3 if (not self.coulomb and self.atom_types > 1) else 1,
         #     output_channels=(self.atom_types + 1)
-        #     if self.target == "total_energy"
+        #     if (self.target == "total_energy" or self.target == "formation_energy")
         #     else 1,
         # )
         # self.net = DeepCNN(
         #     resolution=cfg.resolution,
         #     input_channels=self.atom_types,
-        #     output_channels=(self.atom_types + 1) if self.target == "total_energy" else 1
+        #     output_channels=(self.atom_types + 1) if (self.target == "total_energy" or self.target == "formation_energy") else 1
         # )
         self.net = InceptionResNet(
             resolution=cfg.resolution,
-            input_channels=self.atom_types if not self.coulomb else 1,
+            input_channels=3 if (not self.coulomb and self.atom_types > 1) else 1,
             output_channels=(self.atom_types + 1)
-            if self.target == "total_energy"
+            if (self.target == "total_energy" or self.target == "formation_energy")
             else 1,
+            filters=[16, 32, 64],
+            dense_layers=[128, 64],
         )
 
-    def forward(self, x):
+        # self.net = get_resnet_model(
+        #     in_channels=3 if (not self.coulomb and self.atom_types > 1) else 1,
+        #     out_channels=(self.atom_types + 1)
+        #     if (self.target == "total_energy" or self.target == "formation_energy")
+        #     else 1,
+        # )
 
+        self.save_hyperparameters()
+
+    def forward(self, x):
         out = self.net(x)
 
         return out
@@ -139,9 +112,13 @@ class MyRegressor(pl.LightningModule):
 
     def criterion(self, output, target, data):
         l2 = nn.MSELoss()
-        if self.target == "total_energy":
+        if self.target == "total_energy" or self.target == "formation_energy":
             if self.atom_types == 1:
                 output = output[:, 0] + data[:] * output[:, 1]
+            elif self.atom_types == 2:
+                output = (
+                    output[:, 0] + data[:, 0] * output[:, 1] + data[:, 1] * output[:, 2]
+                )
             elif self.atom_types == 3:
                 output = (
                     output[:, 0]
@@ -154,29 +131,20 @@ class MyRegressor(pl.LightningModule):
         else:
             output = torch.squeeze(output)
 
-        if self.normalize == "z_score":
-            target = (target - self.mean) / self.std
-        elif self.normalize == "normalization":
-            target = (target - self.min) / (self.max - self.min)
-        elif self.normalize == "log":
-            target = torch.log(target + (self.min + 1))
-        elif self.normalize == "boxcox":
-            target = target + self.min
-            target = (target**self._lambda - 1) / self._lambda
-            # target = (
-            #     torch.pow((target + (self.min + 1)), self._lambda) - 1
-            # ) / self._lambda
-
         return (
             torch.sqrt(l2(output, target))
-            if self.target == "total_energy"
+            if (self.target == "total_energy" or self.target == "formation_energy")
             else l2(output, target)
         )
 
     def accuracy(self, output, target, data, test_step=False):
-        if self.target == "total_energy":
+        if self.target == "total_energy" or self.target == "formation_energy":
             if self.atom_types == 1:
                 output = output[:, 0] + data[:] * output[:, 1]
+            elif self.atom_types == 2:
+                output = (
+                    output[:, 0] + data[:, 0] * output[:, 1] + data[:, 1] * output[:, 2]
+                )
             elif self.atom_types == 3:
                 output = (
                     output[:, 0]
@@ -188,16 +156,6 @@ class MyRegressor(pl.LightningModule):
                 raise Exception("Wrong number of atom types\n")
         else:
             output = torch.squeeze(output)
-
-        if self.normalize == "z_score":
-            output = (output * self.std) + self.mean
-        elif self.normalize == "normalization":
-            output = output * (self.max - self.min) + self.min
-        elif self.normalize == "log":
-            output = torch.exp(output) - (self.min + 1)
-        elif self.normalize == "boxcox":
-            output = (output * self._lambda + 1) ** (1 / self._lambda)
-            output = output - self.min
 
         error = torch.abs(output - target) / torch.abs(target) * 100.0
 
@@ -212,12 +170,8 @@ class MyRegressor(pl.LightningModule):
         loss = self.criterion(y_hat, y, n_atoms)
         acc = self.accuracy(y_hat, y, n_atoms)
 
-        self.log(
-            "train_loss", loss, on_epoch=True, prog_bar=True, logger=True, on_step=False
-        )
-        self.log(
-            "train_acc", acc, on_epoch=True, prog_bar=True, logger=True, on_step=False
-        )
+        self.train_loss_step_holder.append(loss)
+        self.train_acc_step_holder.append(acc)
 
         return loss
 
@@ -227,26 +181,44 @@ class MyRegressor(pl.LightningModule):
         loss = self.criterion(y_hat, y, n_atoms)
         acc = self.accuracy(y_hat, y, n_atoms)
 
-        self.log(
-            "val_loss", loss, on_epoch=True, prog_bar=True, logger=True, on_step=False
-        )
-        self.log(
-            "val_acc", acc, on_epoch=True, prog_bar=True, logger=True, on_step=False
-        )
+        self.val_loss_step_holder.append(loss)
+        self.val_acc_step_holder.append(acc)
 
         return loss
 
     def test_step(self, test_batch, batch_idx=None):
-        x, n_atoms, y = test_batch
+        x, n_atoms, y, names = test_batch
         y_hat = self(x)
         error, predictions = self.accuracy(y_hat, y, n_atoms, test_step=True)
 
         self.errors = [*self.errors, *error.tolist()]
         self.plot_y = [*self.plot_y, *y.tolist()]
         self.plot_y_hat = [*self.plot_y_hat, *predictions.tolist()]
+        self.sample_names = [*self.sample_names, *names]
 
-    def validation_epoch_end(self, outputs):
-        loss = sum(output for output in outputs) / len(outputs)
+    def on_validation_epoch_end(self):
+        loss = torch.stack(self.val_loss_step_holder).mean(dim=0)
+        acc = torch.stack(self.val_acc_step_holder).mean(dim=0)
+
+        self.log(
+            "val_loss",
+            loss,
+            on_epoch=True,
+            prog_bar=True,
+            logger=True,
+            on_step=False,
+            sync_dist=True,
+        )
+        self.log(
+            "val_acc",
+            acc,
+            on_epoch=True,
+            prog_bar=True,
+            logger=True,
+            on_step=False,
+            sync_dist=True,
+        )
+
         self.count += 1
         if self.min_val_loss > loss:
             print(
@@ -255,10 +227,40 @@ class MyRegressor(pl.LightningModule):
             self.min_val_loss = loss
             self.count = 0
 
+        self.val_loss_step_holder.clear()
+        self.val_acc_step_holder.clear()
+
+    def on_train_epoch_end(self):
+        loss = torch.stack(self.train_loss_step_holder).mean(dim=0)
+        acc = torch.stack(self.train_acc_step_holder).mean(dim=0)
+
+        self.log(
+            "train_loss",
+            loss,
+            on_epoch=True,
+            prog_bar=True,
+            logger=True,
+            on_step=False,
+            sync_dist=True,
+        )
+        self.log(
+            "train_acc",
+            acc,
+            on_epoch=True,
+            prog_bar=True,
+            logger=True,
+            on_step=False,
+            sync_dist=True,
+        )
+
+        self.train_loss_step_holder.clear()
+        self.train_acc_step_holder.clear()
+
     def on_test_start(self):
         self.errors.clear()
         self.plot_y.clear()
         self.plot_y_hat.clear()
+        self.sample_names.clear()
 
     def on_train_start(self):
         self.log_dict(
@@ -281,13 +283,13 @@ class MyRegressor(pl.LightningModule):
                 time="#e8c309",
                 processing_speed="#e8c309",
                 metrics="#dbd7d7",
-            )
+            ),
         )
 
         return progress_bar
 
 
-class MyDataloader(pl.LightningDataModule):
+class MyDataloader(LightningDataModule):
     def __init__(self, cfg, config=None):
         super().__init__()
         self.spath = cfg.train.spath
@@ -305,7 +307,6 @@ class MyDataloader(pl.LightningDataModule):
         self.coulomb = cfg.coulomb
 
     def setup(self, stage=None):
-
         train_dataset = pd.read_csv(Path(self.spath).joinpath("train", "train.csv"))
         val_dataset = pd.read_csv(Path(self.spath).joinpath("val", "val.csv"))
         test_dataset = pd.read_csv(Path(self.spath).joinpath("test", "test.csv"))
@@ -314,53 +315,43 @@ class MyDataloader(pl.LightningDataModule):
         train_paths = [
             f
             for f in Path(self.spath).joinpath("train").iterdir()
-            if f.suffix == ".png"
+            if (f.suffix == ".png" or f.suffix == ".npy")
         ]
         val_paths = [
-            f for f in Path(self.spath).joinpath("val").iterdir() if f.suffix == ".png"
+            f
+            for f in Path(self.spath).joinpath("val").iterdir()
+            if (f.suffix == ".png" or f.suffix == ".npy")
         ]
         test_paths = [
-            f for f in Path(self.spath).joinpath("test").iterdir() if f.suffix == ".png"
+            f
+            for f in Path(self.spath).joinpath("test").iterdir()
+            if (f.suffix == ".png" or f.suffix == ".npy")
         ]
 
-        if self.cluster:
-            if self.coulomb:
-                self.train_data = MyDatasetCoulombCluster(
-                    train_paths,
-                    train_dataset[self.target],
-                    resolution=self.resolution,
-                )
-                self.val_data = MyDatasetCoulombCluster(
-                    val_paths,
-                    val_dataset[self.target],
-                    resolution=self.resolution,
-                )
-                self.test_data = MyDatasetCoulombCluster(
-                    test_paths,
-                    test_dataset[self.target],
-                    resolution=self.resolution,
-                )
-            else:
-                self.train_data = MyDatasetPngCluster(
-                    train_paths,
-                    train_dataset[self.target],
-                    resolution=self.resolution,
-                    enlargement_method=self.enlargement_method,
-                )
-                self.val_data = MyDatasetPngCluster(
-                    val_paths,
-                    val_dataset[self.target],
-                    resolution=self.resolution,
-                    enlargement_method=self.enlargement_method,
-                )
-                self.test_data = MyDatasetPngCluster(
-                    test_paths,
-                    test_dataset[self.target],
-                    resolution=self.resolution,
-                    enlargement_method=self.enlargement_method,
-                )
+        if self.coulomb:
+            self.train_data = MyDatasetCoulomb(
+                train_paths,
+                train_dataset,
+                self.target,
+                resolution=self.resolution,
+                phase="train",
+            )
+            self.val_data = MyDatasetCoulomb(
+                val_paths,
+                val_dataset,
+                self.target,
+                resolution=self.resolution,
+                phase="val",
+            )
+            self.test_data = MyDatasetCoulomb(
+                test_paths,
+                test_dataset,
+                self.target,
+                resolution=self.resolution,
+                phase="test",
+            )
         else:
-            self.train_data = NewMyDatasetPng(
+            self.train_data = MyDatasetPng(
                 train_paths,
                 train_dataset,
                 self.target,
@@ -368,7 +359,7 @@ class MyDataloader(pl.LightningDataModule):
                 enlargement_method=self.enlargement_method,
                 phase="train",
             )
-            self.val_data = NewMyDatasetPng(
+            self.val_data = MyDatasetPng(
                 val_paths,
                 val_dataset,
                 self.target,
@@ -376,7 +367,7 @@ class MyDataloader(pl.LightningDataModule):
                 enlargement_method=self.enlargement_method,
                 phase="val",
             )
-            self.test_data = NewMyDatasetPng(
+            self.test_data = MyDatasetPng(
                 test_paths,
                 test_dataset,
                 self.target,
@@ -420,7 +411,3 @@ class MyDataloader(pl.LightningDataModule):
             pin_memory=True,
             drop_last=True,
         )
-
-
-if __name__ == "__main__":
-    pass

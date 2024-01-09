@@ -1,21 +1,19 @@
 try:
-
     from lib.lib_trainer_predictor_lightning import MyRegressor, MyDataloader
     import hydra
-    from pytorch_lightning import Trainer, seed_everything
+    from lightning import Trainer, seed_everything
     from pathlib import Path
     import numpy as np
     from lib.lib_utils import Utils
     import yaml
     from telegram_bot import send_message
+    import torch
 
 except Exception as e:
-
-    print("Some module are missing {}".format(e))
+    print(f"Some module are missing from {__file__}: {e}\n")
 
 
 def get_checkpoint_name(checkpoints_path: Path):
-
     best_loss = [
         model
         for model in checkpoints_path.iterdir()
@@ -27,6 +25,10 @@ def get_checkpoint_name(checkpoints_path: Path):
 
 @hydra.main(version_base="1.2", config_path="config", config_name="train_predict")
 def main(cfg):
+    if cfg.train.matmul_precision == "high":
+        torch.set_float32_matmul_precision("high")
+    elif cfg.train.matmul_precision == "medium":
+        torch.set_float32_matmul_precision("medium")
 
     seed_everything(42, workers=True)
 
@@ -45,7 +47,7 @@ def main(cfg):
 
     trainer.test(
         model,
-        dataloaders,
+        datamodule=dataloaders,
         ckpt_path=checkpoints,
     )
     print("Maximum % error = {:.5f}%".format(np.max(model.errors)))
@@ -72,6 +74,14 @@ def main(cfg):
         y=model.plot_y,
         y_hat=model.plot_y_hat,
         dpath=Path(cfg.train.dpath).joinpath(f"{cfg.target}_fit.png"),
+        target=cfg.target,
+    )
+
+    Utils.write_csv_results(
+        y=model.plot_y,
+        y_hat=model.plot_y_hat,
+        names=model.sample_names,
+        dpath=Path(cfg.train.dpath).joinpath(f"{cfg.target}_prediction_results.csv"),
         target=cfg.target,
     )
 

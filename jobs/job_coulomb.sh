@@ -15,7 +15,10 @@ module load slurm
 
 eval "$(conda shell.bash hook)"
 
-conda activate pytorch
+conda activate pl
+
+export PATH=/home/tommaso/cuda/bin${PATH:+:${PATH}}
+export LD_LIBRARY_PATH=/home/tommaso/cuda/lib64${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}
 
 #INSERT YOUR SCRIPT HERE
 

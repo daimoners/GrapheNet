@@ -1,24 +1,27 @@
 atom_types: 3
-cluster: false
+cluster: true
 cluster_num_workers: 8
 coulomb: false
 deterministic: true
 enlargement_method: padding
-normalize: None
 num_workers: 6
-package_path: /home/cnrismn/git_workspace/GrapheNet
-resolution: 145
-sample: /home/cnrismn/git_workspace/GrapheNet/dftb/neutral_1021/neutral_1021.png
-target: total_energy
+package_path: /home/tommaso/git_workspace/GrapheNet
+resolution: 160
+sample: /home/tommaso/git_workspace/GrapheNet/featuremaps_visualization/neutral_15877/neutral_15877.png
+target: formation_energy
 train:
-  base_lr: 0.0
-  batch_size: 64
+  base_lr: 0.20911237334180677
+  batch_size: 32
+  compile: false
   dpath: ${train.spath}/models/${target}
   lr_list:
-    Fermi_energy: 0.09653253233375945
-    electron_affinity: 0.061813296683228255
-    electronegativity: 0.04048360377132749
-    ionization_potential: 0.02133368544635407
-    total_energy: 0.014135120055669028
+    Fermi_energy: 0.058841390814253124
+    electron_affinity: 0.0428044113914066
+    electronegativity: 0.04550807817481413
+    formation_energy: 0.20911237334180677
+    ionization_potential: 0.015186596128617183
+    total_energy: 0.014125999813258398
+    energy_per_atom: 0.05098795176736245
+  matmul_precision: high
   num_epochs: 150
-  spath: ${package_path}/data_GO/training_dataset_complete
+  spath: ${package_path}/test/training_dataset_augmented

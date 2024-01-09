@@ -1,0 +1,27 @@
+atom_types: 3
+cluster: true
+cluster_num_workers: 8
+coulomb: true
+deterministic: true
+enlargement_method: padding
+num_workers: 6
+package_path: /home/tommaso/git_workspace/GrapheNet
+resolution: 1950
+sample: /home/tommaso/git_workspace/GrapheNet/dftb/neutral_1021/neutral_1021.png
+target: formation_energy
+train:
+  base_lr: 0.20911237334180677
+  batch_size: 4
+  compile: false
+  dpath: ${train.spath}/models/${target}
+  lr_list:
+    Fermi_energy: 0.058841390814253124
+    electron_affinity: 0.0428044113914066
+    electronegativity: 0.04550807817481413
+    formation_energy: 0.20911237334180677
+    ionization_potential: 0.015186596128617183
+    total_energy: 0.014125999813258398
+    energy_per_atom: 0.06555071644078239
+  matmul_precision: high
+  num_epochs: 150
+  spath: ${package_path}/Coulomb_GO/training_dataset
