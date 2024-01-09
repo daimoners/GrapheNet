@@ -53,26 +53,26 @@ class MyRegressor(LightningModule):
         #     resolution=cfg.resolution,
         #     input_channels=3 if (not self.coulomb and self.atom_types > 1) else 1,
         #     output_channels=(self.atom_types + 1)
-        #     if self.target == "total_energy"
+        #     if (self.target == "total_energy" or self.target == "formation_energy")
         #     else 1,
         # )
         # self.net = MySimpleResNet(
         #     resolution=cfg.resolution,
         #     input_channels=3 if (not self.coulomb and self.atom_types > 1) else 1,
         #     output_channels=(self.atom_types + 1)
-        #     if self.target == "total_energy"
+        #     if (self.target == "total_energy" or self.target == "formation_energy")
         #     else 1,
         # )
         # self.net = DeepCNN(
         #     resolution=cfg.resolution,
         #     input_channels=self.atom_types,
-        #     output_channels=(self.atom_types + 1) if self.target == "total_energy" else 1
+        #     output_channels=(self.atom_types + 1) if (self.target == "total_energy" or self.target == "formation_energy") else 1
         # )
         self.net = InceptionResNet(
             resolution=cfg.resolution,
             input_channels=3 if (not self.coulomb and self.atom_types > 1) else 1,
             output_channels=(self.atom_types + 1)
-            if self.target == "total_energy"
+            if (self.target == "total_energy" or self.target == "formation_energy")
             else 1,
             filters=[16, 32, 64],
             dense_layers=[128, 64],
@@ -80,7 +80,9 @@ class MyRegressor(LightningModule):
 
         # self.net = get_resnet_model(
         #     in_channels=3 if (not self.coulomb and self.atom_types > 1) else 1,
-        #     out_channels=(self.atom_types + 1) if self.target == "total_energy" else 1,
+        #     out_channels=(self.atom_types + 1)
+        #     if (self.target == "total_energy" or self.target == "formation_energy")
+        #     else 1,
         # )
 
         self.save_hyperparameters()
@@ -110,7 +112,7 @@ class MyRegressor(LightningModule):
 
     def criterion(self, output, target, data):
         l2 = nn.MSELoss()
-        if self.target == "total_energy":
+        if self.target == "total_energy" or self.target == "formation_energy":
             if self.atom_types == 1:
                 output = output[:, 0] + data[:] * output[:, 1]
             elif self.atom_types == 2:
@@ -131,12 +133,12 @@ class MyRegressor(LightningModule):
 
         return (
             torch.sqrt(l2(output, target))
-            if self.target == "total_energy"
+            if (self.target == "total_energy" or self.target == "formation_energy")
             else l2(output, target)
         )
 
     def accuracy(self, output, target, data, test_step=False):
-        if self.target == "total_energy":
+        if self.target == "total_energy" or self.target == "formation_energy":
             if self.atom_types == 1:
                 output = output[:, 0] + data[:] * output[:, 1]
             elif self.atom_types == 2:
@@ -409,7 +411,3 @@ class MyDataloader(LightningDataModule):
             pin_memory=True,
             drop_last=True,
         )
-
-
-if __name__ == "__main__":
-    pass

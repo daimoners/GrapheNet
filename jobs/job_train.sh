@@ -4,7 +4,7 @@
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=0
-#SBATCH --time=100:00:00
+#SBATCH --time=1:00:00
 #SBATCH --job-name=train_GrapheNet
 #SBATCH --error=train.error
 #SBATCH --output=train.log

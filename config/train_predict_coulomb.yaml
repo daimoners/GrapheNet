@@ -20,6 +20,8 @@ train:
     electronegativity: 0.04550807817481413
     formation_energy: 0.20911237334180677
     ionization_potential: 0.015186596128617183
+    total_energy: 0.014125999813258398
+    energy_per_atom: 0.06555071644078239
   matmul_precision: high
   num_epochs: 150
   spath: ${package_path}/Coulomb_GO/training_dataset

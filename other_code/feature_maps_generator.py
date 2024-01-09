@@ -12,6 +12,18 @@ try:
     import shutil
     import pandas as pd
     from tqdm import tqdm
+    from pytorch_grad_cam import (
+        GradCAM,
+        HiResCAM,
+        ScoreCAM,
+        GradCAMPlusPlus,
+        AblationCAM,
+        XGradCAM,
+        EigenCAM,
+        FullGrad,
+    )
+    from pytorch_grad_cam.utils.model_targets import ClassifierOutputTarget
+    from pytorch_grad_cam.utils.image import show_cam_on_image
 
 except Exception as e:
     print("Some module are missing {}".format(e))
@@ -140,6 +152,8 @@ def plot_feature_maps(conv_layers, image, save_path: Path, num_filters: int = 10
             if i == num_filters:  # we will visualize only 8x8 blocks from each layer
                 break
             plt.imshow(filter.detach().cpu(), cmap="plasma")
+            plt.axis("off")
+            plt.subplots_adjust(left=0, right=1, top=1, bottom=0)
             plt.savefig(
                 str(
                     feature_maps_path.joinpath(
@@ -147,6 +161,7 @@ def plot_feature_maps(conv_layers, image, save_path: Path, num_filters: int = 10
                     )
                 )
             )
+            plt.clf()
         plt.close()
 
 
@@ -196,6 +211,8 @@ def inception_plot_feature_maps(
             elif i == num_filters:  # we will visualize only 8x8 blocks from each layer
                 break
             plt.imshow(filter.detach().cpu(), cmap=colormap)
+            plt.axis("off")
+            plt.subplots_adjust(left=0, right=1, top=1, bottom=0)
             plt.savefig(
                 str(
                     feature_maps_path.joinpath(
@@ -203,6 +220,7 @@ def inception_plot_feature_maps(
                     )
                 )
             )
+            plt.clf()
         plt.close()
 
 
@@ -294,7 +312,7 @@ def new_get_weights_and_layers(model):
 
 def load_model(cfg, checkpoints_path: Path):
     # checkpoints = get_model_names(checkpoints_path)
-    checkpoints = "/home/tommaso/git_workspace/GrapheNet/data_GO/training_dataset_reference/models/inceptionresnet/last_high_reduced_layers_lr_workstation_optimized/ionization_potential/best_loss_val_loss=0.01514_epoch=32.ckpt"
+    checkpoints = "/home/tommaso/git_workspace/GrapheNet/data_GO/training_dataset_reference/models/inceptionresnet/last_high_reduced_layers_lr_workstation_optimized/electron_affinity_new/best_loss_val_loss=0.02659_epoch=59.ckpt"
 
     model = MyRegressor(cfg)
     model.load_state_dict(torch.load(checkpoints)["state_dict"])
@@ -304,11 +322,57 @@ def load_model(cfg, checkpoints_path: Path):
     return model
 
 
+def plot_gradcam(
+    img_path,
+    resolution,
+    target,
+    model,
+    conv_layers,
+    cuda=True,
+    enlargement_method="padding",
+):
+    Path(__file__).parent.joinpath("gradCAM").mkdir(exist_ok=True, parents=True)
+    Path(__file__).parent.joinpath("gradCAM_mask").mkdir(exist_ok=True, parents=True)
+    image = load_image(
+        Path(img_path), resolution=resolution, enlargement_method=enlargement_method
+    )
+    target_layers = conv_layers[-1:]
+    cam = GradCAM(model=model, target_layers=target_layers, use_cuda=cuda)
+    # You can also pass aug_smooth=True and eigen_smooth=True, to apply smoothing.
+    grayscale_cam = cam(input_tensor=image)
+    # In this example grayscale_cam has only one image in the batch:
+    grayscale_cam = grayscale_cam[0, :]
+    rgb_image = cv2.imread(str(img_path), -1)
+    if enlargement_method == "padding":
+        rgb_image = Utils.padding_image(rgb_image, size=resolution)
+    elif enlargement_method == "resize":
+        rgb_image = cv2.resize(
+            rgb_image, (resolution, resolution), interpolation=cv2.INTER_CUBIC
+        )
+    rgb_image = np.array(rgb_image)
+    rgb_image = rgb_image / 255.0
+    visualization = show_cam_on_image(
+        rgb_image, grayscale_cam, use_rgb=True, image_weight=0.8
+    )
+    cv2.imwrite(
+        str(Path(__file__).parent.joinpath("gradCAM", f"{img_path.stem}_{target}.png")),
+        visualization,
+    )
+    cv2.imwrite(
+        str(
+            Path(__file__).parent.joinpath(
+                "gradCAM_mask", f"{img_path.stem}_{target}.png"
+            )
+        ),
+        grayscale_cam * 255,
+    )
+
+
 @hydra.main(version_base="1.2", config_path="config", config_name="train_predict")
 def main(cfg):
     seed_everything(42, workers=True)
     save_path = Path(cfg.train.spath).joinpath(
-        "models", f"{cfg.target}", f"visualization_{Path(cfg.sample).stem}"
+        "models", f"{cfg.target}", f"fmaps_{Path(cfg.sample).stem}"
     )
     save_path.mkdir(exist_ok=True, parents=True)
 
@@ -331,6 +395,7 @@ def main(cfg):
     shutil.copy(cfg.sample, str(save_path))
     inception_plot_feature_maps(conv_layers, image, save_path, num_filters=-1)
     # inception_plot_filters(model_weights, save_path)
+    # plot_gradcam(Path(cfg.sample), cfg.resolution, cfg.target, model, conv_layers)
 
 
 if __name__ == "__main__":

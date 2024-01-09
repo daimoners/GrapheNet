@@ -29,6 +29,7 @@ def write_results_yaml(cfg: dict, data: dict = None):
             "learning_rate": cfg.train.base_lr,
             "batch_size": cfg.train.batch_size,
             "dataset": cfg.train.spath,
+            "resolution": cfg.resolution,
         }
         with open(
             str(Path(cfg.train.dpath).joinpath(f"{cfg.target}_train_results.yaml")), "w"

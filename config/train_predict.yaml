@@ -7,10 +7,10 @@ enlargement_method: padding
 num_workers: 6
 package_path: /home/tommaso/git_workspace/GrapheNet
 resolution: 160
-sample: /home/tommaso/git_workspace/GrapheNet/featuremaps_visualization/neutral_1021/neutral_1021.png
-target: ionization_potential
+sample: /home/tommaso/git_workspace/GrapheNet/featuremaps_visualization/neutral_15877/neutral_15877.png
+target: formation_energy
 train:
-  base_lr: 0.0
+  base_lr: 0.20911237334180677
   batch_size: 32
   compile: false
   dpath: ${train.spath}/models/${target}
@@ -20,6 +20,8 @@ train:
     electronegativity: 0.04550807817481413
     formation_energy: 0.20911237334180677
     ionization_potential: 0.015186596128617183
+    total_energy: 0.014125999813258398
+    energy_per_atom: 0.05098795176736245
   matmul_precision: high
   num_epochs: 150
-  spath: ${package_path}/data_GO/training_dataset_xyz_augmented
+  spath: ${package_path}/test/training_dataset_augmented
