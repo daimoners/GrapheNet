@@ -18,7 +18,6 @@ try:
     from pathlib import Path
     import time
     import subprocess
-    from telegram_bot import send_message
     import torch
     import pytorch_lightning as pl
 
@@ -145,15 +144,13 @@ def main(cfg):
             "w",
         ) as outfile:
             yaml.dump(results, outfile)
+
+        name_stem = "train_predict_coulomb" if cfg.coulomb else "train_predict"
         Utils.update_yaml(
-            spath=Path(__file__).parent.joinpath("config", "train_predict.yaml"),
+            spath=Path(__file__).parent.joinpath("config", f"{name_stem}.yaml"),
             target_key="base_lr",
             new_value=analysis.best_config["lr"],
         )
-
-        best_lr = analysis.best_config["lr"]
-        message = f"Optimization of target `{cfg.target}` completed ✅:\n🔺 Learning Rate \\= `{best_lr:.5f}`"
-        send_message(message, parse_mode="MarkdownV2")
 
     if Path.home().joinpath("ray_results", f"{cfg.target}_tune_asha").is_dir():
         shutil.rmtree(

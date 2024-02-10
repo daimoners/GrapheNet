@@ -6,7 +6,6 @@ try:
     import numpy as np
     from lib.lib_utils import Utils
     import yaml
-    from telegram_bot import send_message
     import torch
 
 except Exception as e:
@@ -23,7 +22,7 @@ def get_checkpoint_name(checkpoints_path: Path):
     return str(best_loss[0])
 
 
-@hydra.main(version_base="1.2", config_path="config", config_name="train_predict")
+@hydra.main(version_base="1.2", config_path="config")
 def main(cfg):
     if cfg.train.matmul_precision == "high":
         torch.set_float32_matmul_precision("high")
@@ -84,9 +83,6 @@ def main(cfg):
         dpath=Path(cfg.train.dpath).joinpath(f"{cfg.target}_prediction_results.csv"),
         target=cfg.target,
     )
-
-    message = f"Prediction on target `{cfg.target}` completed ✅:\n🔺 Maximum % error \\= `{np.max(model.errors):.5f}%`\n🔸 Mean % error \\= `{np.mean(model.errors):.5f}%`\n🔹 STD % error \\= `{np.std(model.errors):.5f}%`"
-    send_message(message, parse_mode="MarkdownV2", disable_notification=True)
 
 
 if __name__ == "__main__":

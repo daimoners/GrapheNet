@@ -67,7 +67,7 @@ def get_model_name(model: MyRegressor):
     return name.split(".")[-1]
 
 
-@hydra.main(version_base="1.2", config_path="config", config_name="train_predict")
+@hydra.main(version_base="1.2", config_path="config")
 def main(cfg):
     if cfg.train.matmul_precision == "high":
         torch.set_float32_matmul_precision("high")
@@ -125,9 +125,11 @@ def main(cfg):
     save_model_summary(cfg, model)
 
     start = time.time()
-    trainer.fit(
-        compiled_model, datamodule=dataloaders
-    ) if cfg.train.compile else trainer.fit(model, datamodule=dataloaders)
+    (
+        trainer.fit(compiled_model, datamodule=dataloaders)
+        if cfg.train.compile
+        else trainer.fit(model, datamodule=dataloaders)
+    )
     end = time.time()
 
     print(
