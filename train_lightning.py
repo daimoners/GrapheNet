@@ -2,8 +2,6 @@ try:
     from lib.lib_trainer_predictor_lightning import MyRegressor, MyDataloader
     import hydra
     from lightning.pytorch.callbacks import ModelCheckpoint, EarlyStopping
-    from lightning.pytorch.loggers import WandbLogger
-    from lightning.pytorch.tuner import Tuner
     from pathlib import Path
     import time
     from lightning import Trainer, seed_everything
@@ -12,7 +10,7 @@ try:
     import sys
     import io
     import torch
-    from datetime import datetime
+    from torch import _dynamo
     import subprocess
 
 
@@ -21,28 +19,35 @@ except Exception as e:
 
 
 def write_results_yaml(cfg: dict, data: dict = None):
-    Path(cfg.train.dpath).mkdir(exist_ok=True, parents=True)
+    dpath = Path(__file__).parent.joinpath(
+        f"{cfg.train.dataset_path}/models/{cfg.target}"
+    )
+    dpath.mkdir(exist_ok=True, parents=True)
     if data is None:
         train_data = {
             "target": cfg.target,
             "num_epochs": cfg.train.num_epochs,
             "learning_rate": cfg.train.base_lr,
             "batch_size": cfg.train.batch_size,
-            "dataset": cfg.train.spath,
+            "dataset": cfg.train.dataset_path,
             "resolution": cfg.resolution,
         }
         with open(
-            str(Path(cfg.train.dpath).joinpath(f"{cfg.target}_train_results.yaml")), "w"
+            str(dpath.joinpath(f"{cfg.target}_train_results.yaml")), "w"
         ) as outfile:
             yaml.dump(train_data, outfile)
     else:
         with open(
-            str(Path(cfg.train.dpath).joinpath(f"{cfg.target}_train_results.yaml")), "a"
+            str(dpath.joinpath(f"{cfg.target}_train_results.yaml")), "a"
         ) as outfile:
             yaml.dump(data, outfile)
 
 
 def save_model_summary(cfg: dict, model: MyRegressor):
+    dpath = Path(__file__).parent.joinpath(
+        f"{cfg.train.dataset_path}/models/{cfg.target}"
+    )
+    dpath.mkdir(exist_ok=True, parents=True)
     captured = io.StringIO()
     sys.stdout = captured
     summary(
@@ -53,7 +58,7 @@ def save_model_summary(cfg: dict, model: MyRegressor):
     )
     sys.stdout = sys.__stdout__
 
-    with open(str(Path(cfg.train.dpath).joinpath("model_summary.txt")), "w") as f:
+    with open(str(dpath.joinpath("model_summary.txt")), "w") as f:
         # write the summary to the file
         f.write(captured.getvalue())
 
@@ -78,10 +83,16 @@ def main(cfg):
 
     model = MyRegressor(cfg)
     if cfg.train.compile:
+        _dynamo.config.suppress_errors = True
         compiled_model = torch.compile(model)
 
+    dpath = Path(__file__).parent.joinpath(
+        f"{cfg.train.dataset_path}/models/{cfg.target}"
+    )
+    dpath.mkdir(exist_ok=True, parents=True)
+
     checkpoint_callback = ModelCheckpoint(
-        dirpath=cfg.train.dpath,
+        dirpath=str(dpath),
         save_top_k=1,
         monitor="val_loss",
         filename="best_loss_{val_loss:.5f}_{epoch}",
@@ -133,13 +144,18 @@ def main(cfg):
     end = time.time()
 
     print(
-        f"Completed training:\n TARGET = {cfg.target}\n DATASET = {cfg.train.spath}\n NUM EPOCHS = {cfg.train.num_epochs}\n TRAINING TIME = {(end-start)/60:.3f} minutes"
+        f"Completed training:\n TARGET = {cfg.target}\n DATASET = {cfg.train.dataset_path}\n NUM EPOCHS = {cfg.train.num_epochs}\n TRAINING TIME = {(end-start)/60:.3f} minutes"
     )
 
     write_results_yaml(cfg, data={"training_time": float((end - start) / 60)})
 
     process = subprocess.Popen(
-        ["python", str(Path(__file__).parent.joinpath("predict_lightning.py"))]
+        [
+            "python",
+            str(Path(__file__).parent.joinpath("predict_lightning.py")),
+            "-cn",
+            f"{cfg.name}.yaml",
+        ]
     )
     process.wait()
 

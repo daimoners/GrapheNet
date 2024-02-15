@@ -14,7 +14,7 @@ try:
     from pathlib import Path
     import matplotlib.pyplot as plt
     import math
-    from scipy.stats import pearsonr, spearmanr, kendalltau, boxcox
+    from scipy.stats import boxcox
     import yaml
     from sklearn.model_selection import StratifiedShuffleSplit, train_test_split
     from scipy.spatial.distance import pdist
@@ -1299,9 +1299,11 @@ class CoulombUtils:
         pbar = tqdm(total=len(items))
 
         for i in items:
-            CoulombUtils.fast_compute_coulomb_matrix(
-                i, dpath
-            ) if fast else CoulombUtils.compute_coulomb_matrix(i, dpath)
+            (
+                CoulombUtils.fast_compute_coulomb_matrix(i, dpath)
+                if fast
+                else CoulombUtils.compute_coulomb_matrix(i, dpath)
+            )
             pbar.update(1)
         pbar.close()
 

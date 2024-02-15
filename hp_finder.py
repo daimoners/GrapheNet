@@ -1,23 +1,18 @@
 try:
     from lightning.pytorch.loggers import TensorBoardLogger
-    import ray
     from ray import tune
     from ray.tune import CLIReporter
-    from ray.tune.schedulers import ASHAScheduler, PopulationBasedTraining
-    from ray.tune.integration.pytorch_lightning import (
-        TuneReportCallback,
-        TuneReportCheckpointCallback,
-    )
+    from ray.tune.schedulers import ASHAScheduler
+    from ray.tune.integration.pytorch_lightning import TuneReportCallback
     from lib.lib_trainer_predictor_lightning import MyRegressor, MyDataloader
     from lib.lib_utils import Utils
-    from lightning import Trainer, seed_everything
+    from lightning import seed_everything
     import shutil
     import hydra
     from ray.tune.search.optuna import OptunaSearch
     import yaml
     from pathlib import Path
     import time
-    import subprocess
     import torch
     import pytorch_lightning as pl
 
@@ -25,7 +20,7 @@ except Exception as e:
     print("Some module are missing {}".format(e))
 
 
-@hydra.main(version_base="1.2", config_path="config", config_name="train_predict")
+@hydra.main(version_base="1.2", config_path="config")
 def main(cfg):
     if cfg.train.matmul_precision == "high":
         torch.set_float32_matmul_precision("high")
@@ -93,10 +88,7 @@ def main(cfg):
         gpus_per_trial=1,
     ):
         config = {
-            "lr": tune.loguniform(
-                1e-3, 1
-            ),  # dopo aver trovato un certo range con "lr": tune.loguniform(1e-4, 1e-2) e analizzando i risultati su tensorboard, uso "lr": tune.loguniform(0.007, 0.009) sul range trovato con il range (1e-4, 1e-2)
-            # "batch_size": tune.choice([16, 32]),
+            "lr": tune.loguniform(1e-4, 1),
         }
 
         scheduler = ASHAScheduler(
@@ -136,8 +128,10 @@ def main(cfg):
 
         print("Best hyperparameters found were: ", analysis.best_config)
 
-        dpath = Path(cfg.train.dpath)
-        dpath.mkdir(parents=True, exist_ok=True)
+        dpath = Path(__file__).parent.joinpath(
+            f"{cfg.train.dataset_path}/models/{cfg.target}"
+        )
+        dpath.mkdir(exist_ok=True, parents=True)
 
         with open(
             str(dpath.joinpath(f"{cfg.target}_optimization_results.yaml")),
@@ -149,6 +143,11 @@ def main(cfg):
         Utils.update_yaml(
             spath=Path(__file__).parent.joinpath("config", f"{name_stem}.yaml"),
             target_key="base_lr",
+            new_value=analysis.best_config["lr"],
+        )
+        Utils.update_yaml(
+            spath=Path(__file__).parent.joinpath("config", f"{name_stem}.yaml"),
+            target_key=f"{cfg.target}",
             new_value=analysis.best_config["lr"],
         )
 

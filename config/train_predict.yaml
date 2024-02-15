@@ -1,19 +1,16 @@
+name: train_predict
 atom_types: 3
 cluster: true
-cluster_num_workers: 8
 coulomb: false
 deterministic: true
+num_workers: 8
 enlargement_method: padding
-num_workers: 6
-package_path: /home/tommaso/git_workspace/GrapheNet
 resolution: 160
-sample: /home/tommaso/git_workspace/GrapheNet/featuremaps_visualization/neutral_15877/neutral_15877.png
 target: formation_energy
 train:
   base_lr: 0.20911237334180677
   batch_size: 32
-  compile: false
-  dpath: ${train.spath}/models/${target}
+  compile: true
   lr_list:
     Fermi_energy: 0.058841390814253124
     electron_affinity: 0.0428044113914066
@@ -24,4 +21,4 @@ train:
     energy_per_atom: 0.05098795176736245
   matmul_precision: high
   num_epochs: 150
-  spath: ${package_path}/test/training_dataset_augmented
+  dataset_path: data_2/training_dataset

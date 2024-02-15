@@ -31,7 +31,12 @@ def main(cfg):
 
     seed_everything(42, workers=True)
 
-    checkpoints = get_checkpoint_name(Path(cfg.train.dpath))
+    dpath = Path(__file__).parent.joinpath(
+        f"{cfg.train.dataset_path}/models/{cfg.target}"
+    )
+    dpath.mkdir(exist_ok=True, parents=True)
+
+    checkpoints = get_checkpoint_name(dpath)
 
     model = MyRegressor(cfg)
 
@@ -61,7 +66,7 @@ def main(cfg):
 
     with open(
         str(
-            Path(cfg.train.dpath).joinpath(
+            dpath.joinpath(
                 f"{cfg.target}_prediction_results.yaml",
             )
         ),
@@ -72,7 +77,7 @@ def main(cfg):
     Utils.plot_fit(
         y=model.plot_y,
         y_hat=model.plot_y_hat,
-        dpath=Path(cfg.train.dpath).joinpath(f"{cfg.target}_fit.png"),
+        dpath=dpath.joinpath(f"{cfg.target}_fit.png"),
         target=cfg.target,
     )
 
@@ -80,7 +85,7 @@ def main(cfg):
         y=model.plot_y,
         y_hat=model.plot_y_hat,
         names=model.sample_names,
-        dpath=Path(cfg.train.dpath).joinpath(f"{cfg.target}_prediction_results.csv"),
+        dpath=dpath.joinpath(f"{cfg.target}_prediction_results.csv"),
         target=cfg.target,
     )
 

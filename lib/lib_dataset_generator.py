@@ -39,25 +39,12 @@ class DatasetGenerator(object):
         pbar.close()
 
     @staticmethod
-    def drop_custom(
-        df: pd.DataFrame,
-    ):
-        # indices = df.index[df["electron_affinity"] < -5.7].tolist()
-
-        indices = df.index[~df["electron_affinity"].between(-5.9, -5.2)].tolist()
-
-        df = df.drop(indices, axis=0)
-
-        return df
-
-    @staticmethod
     def filter_csv(
         csv_path: Path,
         dpath: Path,
         n_items: int,
         oxygen_outliers_th: float = 0.0,
         min_num_atoms: int | list = 0,
-        drop_custom: bool = False,
     ):
         dpath.mkdir(exist_ok=True, parents=True)
 
@@ -77,10 +64,6 @@ class DatasetGenerator(object):
             else:
                 raise Exception(f"Wrong class for {min_num_atoms}")
             print(f"Lenght after dropping min num atoms outliers: {len(df)}")
-
-        if drop_custom:
-            df = DatasetGenerator.drop_custom(df)
-            print(f"Lenght after dropping custom outliers: {len(df)}")
 
         if n_items == 0:
             df.to_csv(dpath.joinpath("dataset.csv"))
@@ -109,8 +92,10 @@ class DatasetGenerator(object):
             complete_df.to_csv(dpath.joinpath("dataset.csv"))
 
     def __init__(self, cfg):
-        self.spath = Path(cfg.spath)
-        self.dpath = Path(cfg.dpath)
+        self.package_path = Path(__file__).parent.parent
+        self.data_path = self.package_path.joinpath(cfg.data_folder)
+        self.spath = self.data_path.joinpath("png_files")
+        self.dpath = self.data_path.joinpath(cfg.dataset_name)
         self.plot_distributions = cfg.plot_distributions
         self.train_split = cfg.randomly.train_split
         self.test_split = cfg.randomly.test_split
@@ -118,18 +103,25 @@ class DatasetGenerator(object):
         self.shuffle = cfg.randomly.shuffle
 
         self.features = cfg.features
-        self.path_csv = Path(cfg.path_csv)
-        self.path_xyz = Path(cfg.path_xyz)
+        self.path_xyz = self.data_path.joinpath("xyz_files")
+        self.path_xyz.mkdir(exist_ok=True, parents=True)
 
-        self.csv_dataset_path = Path(cfg.from_csv.csv_dataset_path)
+        self.path_csv = self.data_path.joinpath("xyz_files", "dataset.csv")
 
-        self.package_path = cfg.package_path
+        try:
+            self.from_dataset_csv_path = Path(cfg.from_dataset.dataset_path).joinpath(
+                "dataset.csv"
+            )
+            self.from_dataset_csv_path = self.from_dataset_csv_path.expanduser()
+        except:
+            self.from_dataset_csv_path = Path()
 
-        self.stock_dataset_path = Path(cfg.stock_csv_path)
+        self.stock_dataset_path = Path(cfg.dataset_csv_path)
+        self.stock_dataset_path = self.stock_dataset_path.expanduser()
+
         self.n_items = cfg.randomly.n_items
         self.oxygen_outliers_th = cfg.randomly.oxygen_outliers_th
         self.min_num_atoms = cfg.randomly.min_num_atoms
-        self.drop_custom_flag = cfg.randomly.drop_custom
 
         self.augmented_png = cfg.augmented_png
         self.augmented_xyz = cfg.augmented_xyz
@@ -137,14 +129,13 @@ class DatasetGenerator(object):
         if self.augmented_xyz and self.augmented_png:
             raise Exception("Cannot augment both xyz and png")
 
-        if not self.csv_dataset_path.is_file():
+        if not self.from_dataset_csv_path.is_file():
             DatasetGenerator.filter_csv(
                 csv_path=self.stock_dataset_path,
                 dpath=self.path_xyz,
                 n_items=self.n_items,
                 oxygen_outliers_th=self.oxygen_outliers_th,
                 min_num_atoms=self.min_num_atoms,
-                drop_custom=self.drop_custom_flag,
             )
             DatasetGenerator.copy_xyz_files(
                 csv_path=self.path_xyz.joinpath("dataset.csv"),
@@ -153,16 +144,20 @@ class DatasetGenerator(object):
             )
         else:
             DatasetGenerator.copy_xyz_files(
-                csv_path=self.csv_dataset_path,
+                csv_path=self.from_dataset_csv_path,
                 spath=self.stock_dataset_path.parent,
                 dpath=self.path_xyz,
                 complete_csv_path=self.stock_dataset_path,
             )
             if self.augmented_xyz:
                 DatasetGenerator.rotate_all_xyz(spath=self.path_xyz)
-        DatasetGenerator.generate_cropped_png_dataset_from_xyz(
-            spath=self.path_xyz, dpath=self.spath
-        ) if not self.spath.is_dir() else None
+        (
+            DatasetGenerator.generate_cropped_png_dataset_from_xyz(
+                spath=self.path_xyz, dpath=self.spath
+            )
+            if not self.spath.is_dir()
+            else None
+        )
         self.split_dataset()
         Utils.generate_num_atoms(dataset_path=self.dpath, xyz_path=self.path_xyz)
         Utils.find_max_dimensions_png_folder(spath=self.spath, dpath=self.dpath)

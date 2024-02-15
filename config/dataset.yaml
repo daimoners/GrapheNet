@@ -1,11 +1,6 @@
-package_path: "/home/tommaso/git_workspace/GrapheNet"
-data_path: "${package_path}/data_GO"
-stock_csv_path: "/home/tommaso/xyz_files_GO/dataset_with_formation_energy.csv"
-path_xyz: "${data_path}/xyz_files/"
-path_csv: "${path_xyz}/dataset.csv"
-spath: "${data_path}/png_files"
-dpath: "${data_path}/training_dataset_xyz_augmented_new/"
-plot_distributions: True
+data_folder: data
+dataset_name: training_dataset
+dataset_csv_path: ~/xyz_files_GO/dataset_with_formation_energy.csv
 features:
   [
     "ionization_potential",
@@ -14,8 +9,9 @@ features:
     "Fermi_energy",
     "formation_energy",
   ]
+plot_distributions: True
 augmented_png: false
-augmented_xyz: true
+augmented_xyz: false
 
 randomly:
   n_items: 7000
@@ -25,7 +21,6 @@ randomly:
   shuffle: True
   oxygen_outliers_th: 0.2
   min_num_atoms: 0
-  drop_custom: True
 
-from_csv:
-  csv_dataset_path: "/home/tommaso/git_workspace/GrapheNet/data_GO/training_dataset_reduced/dataset.csv"
+from_dataset:
+  dataset_path:

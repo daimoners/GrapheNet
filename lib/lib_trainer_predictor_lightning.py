@@ -6,11 +6,9 @@ try:
     from torch.utils.data import DataLoader
     import pandas as pd
     from pathlib import Path
-    import lightning as pl
     from lightning import LightningModule, LightningDataModule
     from lightning.pytorch.callbacks import RichProgressBar
     from lightning.pytorch.callbacks.progress.rich_progress import RichProgressBarTheme
-    import numpy as np
     from lib.lib_networks import (
         InceptionResNet,
         MySimpleNet,
@@ -49,41 +47,17 @@ class MyRegressor(LightningModule):
 
         self.min_val_loss = float("inf")
 
-        # self.net = MySimpleNet(
-        #     resolution=cfg.resolution,
-        #     input_channels=3 if (not self.coulomb and self.atom_types > 1) else 1,
-        #     output_channels=(self.atom_types + 1)
-        #     if (self.target == "total_energy" or self.target == "formation_energy")
-        #     else 1,
-        # )
-        # self.net = MySimpleResNet(
-        #     resolution=cfg.resolution,
-        #     input_channels=3 if (not self.coulomb and self.atom_types > 1) else 1,
-        #     output_channels=(self.atom_types + 1)
-        #     if (self.target == "total_energy" or self.target == "formation_energy")
-        #     else 1,
-        # )
-        # self.net = DeepCNN(
-        #     resolution=cfg.resolution,
-        #     input_channels=self.atom_types,
-        #     output_channels=(self.atom_types + 1) if (self.target == "total_energy" or self.target == "formation_energy") else 1
-        # )
         self.net = InceptionResNet(
             resolution=cfg.resolution,
             input_channels=3 if (not self.coulomb and self.atom_types > 1) else 1,
-            output_channels=(self.atom_types + 1)
-            if (self.target == "total_energy" or self.target == "formation_energy")
-            else 1,
+            output_channels=(
+                (self.atom_types + 1)
+                if (self.target == "total_energy" or self.target == "formation_energy")
+                else 1
+            ),
             filters=[16, 32, 64],
             dense_layers=[128, 64],
         )
-
-        # self.net = get_resnet_model(
-        #     in_channels=3 if (not self.coulomb and self.atom_types > 1) else 1,
-        #     out_channels=(self.atom_types + 1)
-        #     if (self.target == "total_energy" or self.target == "formation_energy")
-        #     else 1,
-        # )
 
         self.save_hyperparameters()
 
@@ -164,7 +138,7 @@ class MyRegressor(LightningModule):
         else:
             return torch.mean(100.0 - error)
 
-    def training_step(self, train_batch, batch_idx=None, optimizer_idx=None):
+    def training_step(self, train_batch, batch_idx=None):
         x, n_atoms, y = train_batch
         y_hat = self(x)
         loss = self.criterion(y_hat, y, n_atoms)
@@ -292,7 +266,8 @@ class MyRegressor(LightningModule):
 class MyDataloader(LightningDataModule):
     def __init__(self, cfg, config=None):
         super().__init__()
-        self.spath = cfg.train.spath
+        self.package_path = Path(__file__).parent.parent
+        self.spath = self.package_path.joinpath(cfg.train.dataset_path)
         self.target = cfg.target
 
         self.batch_size = (
@@ -301,8 +276,6 @@ class MyDataloader(LightningDataModule):
 
         self.resolution = cfg.resolution
         self.num_workers = cfg.num_workers
-        self.cluster = cfg.cluster
-        self.cluster_num_workers = cfg.cluster_num_workers
         self.enlargement_method = cfg.enlargement_method
         self.coulomb = cfg.coulomb
 
@@ -381,9 +354,7 @@ class MyDataloader(LightningDataModule):
             self.train_data,
             batch_size=self.batch_size,
             shuffle=True,
-            num_workers=self.num_workers
-            if not self.cluster
-            else self.cluster_num_workers,
+            num_workers=(self.num_workers),
             pin_memory=True,
             drop_last=True,
         )
@@ -393,9 +364,7 @@ class MyDataloader(LightningDataModule):
             self.val_data,
             batch_size=self.batch_size,
             shuffle=False,
-            num_workers=self.num_workers
-            if not self.cluster
-            else self.cluster_num_workers,
+            num_workers=(self.num_workers),
             pin_memory=True,
             drop_last=True,
         )
@@ -405,9 +374,7 @@ class MyDataloader(LightningDataModule):
             self.test_data,
             batch_size=self.batch_size,
             shuffle=False,
-            num_workers=self.num_workers
-            if not self.cluster
-            else self.cluster_num_workers,
+            num_workers=(self.num_workers),
             pin_memory=True,
             drop_last=True,
         )
