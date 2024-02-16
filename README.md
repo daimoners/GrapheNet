@@ -14,7 +14,7 @@ The paper is about using computer vision techniques (and in particular convoluti
 1. Clone the repository and enter the GrapheNet directory:
 
    ```bash
-   git clone https://github.com/daimoners/GrapheNet.git && cd GrapheNet
+   git clone -b published https://github.com/daimoners/GrapheNet.git && cd GrapheNet
    ```
 
 2. Create the conda env from the conda_env.yaml file:
