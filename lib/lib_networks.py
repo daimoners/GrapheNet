@@ -1,9 +1,9 @@
 try:
+    import numpy as np
     import torch.nn as nn
     import torch
     import torchvision.models as models
     import cv2
-    import numpy as np
     from lib.lib_utils import Utils
 
 

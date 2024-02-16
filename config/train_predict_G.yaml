@@ -1,0 +1,19 @@
+atom_types: 1
+cluster: true
+coulomb: false
+deterministic: true
+enlargement_method: padding
+name: train_predict_G
+num_workers: 8
+resolution: 85
+target: energy_per_atom
+train:
+  base_lr: 0.05098795176736245
+  batch_size: 32
+  compile: true
+  dataset_path: data/training_dataset
+  lr_list:
+    total_energy: 0.014125999813258398
+    energy_per_atom: 0.05098795176736245
+  matmul_precision: high
+  num_epochs: 150

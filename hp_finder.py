@@ -1,12 +1,10 @@
 try:
-    from lightning.pytorch.loggers import TensorBoardLogger
     from ray import tune
     from ray.tune import CLIReporter
     from ray.tune.schedulers import ASHAScheduler
-    from ray.tune.integration.pytorch_lightning import TuneReportCallback
+    from ray.tune.integration.pytorch_lightning import TuneReportCheckpointCallback
     from lib.lib_trainer_predictor_lightning import MyRegressor, MyDataloader
     from lib.lib_utils import Utils
-    from lightning import seed_everything
     import shutil
     import hydra
     from ray.tune.search.optuna import OptunaSearch
@@ -15,9 +13,16 @@ try:
     import time
     import torch
     import pytorch_lightning as pl
+    from pytorch_lightning import seed_everything, Trainer
+    from pytorch_lightning.loggers import TensorBoardLogger
 
 except Exception as e:
     print("Some module are missing {}".format(e))
+
+
+class _TuneReportCallback(TuneReportCheckpointCallback, pl.Callback):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
 
 
 @hydra.main(version_base="1.2", config_path="config")
@@ -39,7 +44,7 @@ def main(cfg):
         model = MyRegressor(cfg, config)
 
         if cfg.cluster:
-            trainer = pl.Trainer(
+            trainer = Trainer(
                 deterministic=cfg.deterministic,
                 max_epochs=num_epochs,
                 # If fractional GPUs passed in, convert to int.
@@ -53,7 +58,7 @@ def main(cfg):
                     version=".",
                 ),
                 callbacks=[
-                    TuneReportCallback(
+                    _TuneReportCallback(
                         {"loss": "val_loss", "mean_accuracy": "val_acc"},
                         on="validation_end",
                     )
@@ -61,7 +66,7 @@ def main(cfg):
                 enable_progress_bar=False,
             )
         else:
-            trainer = pl.Trainer(
+            trainer = Trainer(
                 deterministic=cfg.deterministic,
                 max_epochs=num_epochs,
                 # If fractional GPUs passed in, convert to int.
@@ -73,7 +78,7 @@ def main(cfg):
                     version=".",
                 ),
                 callbacks=[
-                    TuneReportCallback(
+                    _TuneReportCallback(
                         {"loss": "val_loss", "mean_accuracy": "val_acc"},
                         on="validation_end",
                     )
@@ -139,14 +144,13 @@ def main(cfg):
         ) as outfile:
             yaml.dump(results, outfile)
 
-        name_stem = "train_predict_coulomb" if cfg.coulomb else "train_predict"
         Utils.update_yaml(
-            spath=Path(__file__).parent.joinpath("config", f"{name_stem}.yaml"),
+            spath=Path(__file__).parent.joinpath("config", f"{cfg.name}.yaml"),
             target_key="base_lr",
             new_value=analysis.best_config["lr"],
         )
         Utils.update_yaml(
-            spath=Path(__file__).parent.joinpath("config", f"{name_stem}.yaml"),
+            spath=Path(__file__).parent.joinpath("config", f"{cfg.name}.yaml"),
             target_key=f"{cfg.target}",
             new_value=analysis.best_config["lr"],
         )

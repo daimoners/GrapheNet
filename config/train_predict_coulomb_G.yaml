@@ -1,0 +1,19 @@
+name: train_predict_coulomb_G
+atom_types: 3
+cluster: true
+coulomb: true
+deterministic: true
+num_workers: 8
+enlargement_method: padding
+resolution: 450
+target: energy_per_atom
+train:
+  base_lr: 0.06555071644078239
+  batch_size: 4
+  compile: false
+  lr_list:
+    total_energy: 0.014125999813258398
+    energy_per_atom: 0.06555071644078239
+  matmul_precision: high
+  num_epochs: 150
+  dataset_path: data/Coulomb_G/training_dataset

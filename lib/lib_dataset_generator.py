@@ -1,4 +1,5 @@
 try:
+    import numpy as np
     from tqdm import tqdm
     from lib.lib_utils import Utils
     import pandas as pd
@@ -6,7 +7,6 @@ try:
     from pathlib import Path
     import random
     import cv2
-    import numpy as np
 
 except Exception as e:
     print("Some module are missing {}".format(e))
@@ -100,7 +100,6 @@ class DatasetGenerator(object):
         self.train_split = cfg.randomly.train_split
         self.test_split = cfg.randomly.test_split
         self.val_split = cfg.randomly.val_split
-        self.shuffle = cfg.randomly.shuffle
 
         self.features = cfg.features
         self.path_xyz = self.data_path.joinpath("xyz_files")

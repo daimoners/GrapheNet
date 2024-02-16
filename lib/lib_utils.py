@@ -1,7 +1,7 @@
 try:
+    import numpy as np
     from datetime import datetime
     import seaborn as sns
-    import numpy as np
     import pandas as pd
     import shutil
     from tqdm import tqdm
@@ -16,7 +16,7 @@ try:
     import math
     from scipy.stats import boxcox
     import yaml
-    from sklearn.model_selection import StratifiedShuffleSplit, train_test_split
+    from sklearn.model_selection import train_test_split
     from scipy.spatial.distance import pdist
 
 except Exception as e:
@@ -64,19 +64,6 @@ class Utils:
                     Y.append(float(l[2]))
                     Z.append(float(l[3]))
                     atoms.append(str(l[0]))
-
-        # if ("O" or "H") in atoms:
-        #     atom_order = {"C": 0, "O": 1, "H": 2}
-        #     sorted_indices = np.argsort([atom_order[atom] for atom in atoms])
-        #     X = np.asarray(X)[sorted_indices]
-        #     Y = np.asarray(Y)[sorted_indices]
-        #     Z = np.asarray(Z)[sorted_indices]
-        #     atoms = np.asarray(atoms)[sorted_indices]
-
-        # else:
-        #     X = np.asarray(X)
-        #     Y = np.asarray(Y)
-        #     Z = np.asarray(Z)
 
         X = np.asarray(X)
         Y = np.asarray(Y)
@@ -189,39 +176,18 @@ class Utils:
                 y_coord = int(round(Y[i] * 2) + resolution / 2)
                 if C[y_coord, x_coord] < z_norm(Z[i]):
                     C[y_coord, x_coord] = z_norm(Z[i])
-                # if C[y_coord, x_coord] == 0:
-                #     C[y_coord, x_coord] = z_norm(Z[i])
-                # elif Utils.find_first_empty_cell(C, x=x_coord, y=y_coord) is not None:            #! Qui ho provato a eliminare gli overlaps spostando l'atomo sovrapposto in un pixel adiacente, ma non ho trovato miglioramenti
-                #     adj_x, adj_y = Utils.find_first_empty_cell(C, x=x_coord, y=y_coord)
-                #     C[adj_y, adj_x] = z_norm(Z[i])
-                # else:
-                #     count += 1
             elif atoms[i] == "O":
                 C_only = False
                 x_coord = int(round(X[i] * 2) + resolution / 2)
                 y_coord = int(round(Y[i] * 2) + resolution / 2)
                 if O[y_coord, x_coord] < z_norm(Z[i]):
                     O[y_coord, x_coord] = z_norm(Z[i])
-                # if O[y_coord, x_coord] == 0:
-                #     O[y_coord, x_coord] = z_norm(Z[i])
-                # elif Utils.find_first_empty_cell(O, x=x_coord, y=y_coord) is not None:
-                #     adj_x, adj_y = Utils.find_first_empty_cell(O, x=x_coord, y=y_coord)
-                #     O[adj_y, adj_x] = z_norm(Z[i])
-                # else:
-                #     count += 1
             elif atoms[i] == "H":
                 C_only = False
                 x_coord = int(round(X[i] * 2) + resolution / 2)
                 y_coord = int(round(Y[i] * 2) + resolution / 2)
                 if H[y_coord, x_coord] < z_norm(Z[i]):
                     H[y_coord, x_coord] = z_norm(Z[i])
-                # if H[y_coord, x_coord] == 0:
-                #     H[y_coord, x_coord] = z_norm(Z[i])
-                # elif Utils.find_first_empty_cell(H, x=x_coord, y=y_coord) is not None:
-                #     adj_x, adj_y = Utils.find_first_empty_cell(H, x=x_coord, y=y_coord)
-                #     H[adj_y, adj_x] = z_norm(Z[i])
-                # else:
-                #     count += 1
 
         name = spath.stem
 
@@ -1069,93 +1035,6 @@ class Utils:
         else:
             print(f"{target_key} not found in the file")
 
-    @staticmethod
-    def stratified_split(
-        csv_path: Path, target: str, split: list = [0.7, 0.15, 0.15]
-    ):  #! questo serve per fare meglio lo split
-        def assign_classes(array, start, stop, step=1):
-            # Define the range for each class
-
-            class_ranges = [
-                (start + i * step, start + (i + 1) * step)
-                for i in range(int((stop - start) / step))
-            ]
-
-            # Create an empty list to store the classes
-            classes = []
-
-            # Loop through each float value in the array
-            for value in array:
-                # Loop through each class range
-                for i, (low, high) in enumerate(class_ranges):
-                    # If the value falls within the class range, add the class label to the list
-                    if low < value <= high:
-                        classes.append(i)
-                        break
-
-            # Return the list of classes as a numpy array
-            return np.array(classes)
-
-        df = pd.read_csv(csv_path)
-
-        df = Utils.drop_nan_and_zeros(df)
-
-        X = np.zeros(len(df))
-
-        y = df[target].values
-        print(len(y))
-        max = np.max(y) + 0.5
-        min = np.min(y) - 0.5
-        y = assign_classes(y, start=min, stop=max, step=1)
-
-        # Split the data into training, validation, and test sets for target 1
-        sss = StratifiedShuffleSplit(n_splits=1, test_size=0.3)
-
-        for train_index, test_valid_index in sss.split(X, y):
-            df_train, df_test_valid = (
-                df.iloc[train_index],
-                df.iloc[test_valid_index],
-            )
-            X_train, X_test_valid = X[train_index], X[test_valid_index]
-            y_train, y_test_valid = y[train_index], y[test_valid_index]
-
-        # Split the data into training, validation, and test sets for target 1
-        sss = StratifiedShuffleSplit(n_splits=1, test_size=0.5)
-
-        for valid_index, test_index in sss.split(X_test_valid, y_test_valid):
-            df_val, df_test = (
-                df_test_valid.iloc[valid_index],
-                df_test_valid.iloc[test_index],
-            )
-
-        # df_test.to_csv(csv_path.with_name("test.csv"))
-        # df_val.to_csv(csv_path.with_name("val.csv"))
-        # df_train.to_csv(csv_path.with_name("train.csv"))
-
-        # sns.set_style("white")
-
-        # for i in ["train", "test", "val"]:
-
-        #     if i == "train":
-        #         x = df_train[target]
-        #     elif i == "test":
-        #         x = df_test[target]
-        #     elif i == "val":
-        #         x = df_val[target]
-
-        #     # Plot
-        #     kwargs = dict(hist_kws={"alpha": 0.6}, kde_kws={"linewidth": 2})
-
-        #     plt.figure(figsize=(15, 10), dpi=100)
-        #     try:
-        #         sns.distplot(x, color="purple", label=target, **kwargs)
-        #     except:
-        #         pass
-        #     plt.legend()
-        #     plt.savefig(csv_path.parent.joinpath(f"{i}.png"))
-
-        return df_train, df_val, df_test
-
 
 class CoulombUtils:
     @staticmethod
@@ -1395,15 +1274,6 @@ class OxygenUtils:
         df = pd.read_csv(str(csv_path))
         distribution = np.loadtxt(str(distribution_path))
 
-        # df = df.dropna(
-        #     subset=[
-        #         "electronegativity",
-        #         "total_energy",
-        #         "electron_affinity",
-        #         "ionization_potential",
-        #         "Fermi_energy",
-        #     ]
-        # )
         df["electronegativity"].fillna(0, inplace=True)
         print(len(df))
 
@@ -1427,29 +1297,6 @@ class OxygenUtils:
             distribution = (distribution - min_distribution) / (
                 max_distribution - min_distribution
             ) + 0.0001
-
-        # # Calculate Pearson correlation coefficient
-        # pearson_corr, p_value = pearsonr(df["total_energy"], distribution)
-        # print("Pearson correlation coefficient:", pearson_corr)
-
-        # # Calculate Spearman rank correlation coefficient
-        # spear_corr, p_value = spearmanr(df["total_energy"], distribution)
-        # print("Spearman rank correlation coefficient:", spear_corr)
-
-        # # Calculate Kendall rank correlation coefficient
-        # kendall_corr, p_value = kendalltau(df["total_energy"], distribution)
-        # print("Kendall rank correlation coefficient:", kendall_corr)
-
-        # correlation = {
-        #     "Pearson correlation coefficient": float(pearson_corr),
-        #     "Spearman rank correlation coefficient": float(spear_corr),
-        #     "Kendall rank correlation coefficient": float(kendall_corr),
-        # }
-        # with open(
-        #     str(dpath.joinpath("correlation.yaml")),
-        #     "w",
-        # ) as outfile:
-        #     yaml.dump(correlation, outfile)
 
         # Scatter plot
         plt.scatter(np.exp(df["electronegativity"]), np.exp(distribution))

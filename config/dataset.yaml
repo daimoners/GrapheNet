@@ -18,7 +18,6 @@ randomly:
   train_split: 0.7
   val_split: 0.15
   test_split: 0.15
-  shuffle: True
   oxygen_outliers_th: 0.2
   min_num_atoms: 0
 

@@ -42,8 +42,14 @@ def main(cfg):
 
         print(f"Training for target: {target}")
         process = subprocess.Popen(
-            ["python", str(Path(__file__).parent.joinpath("train_lightning.py"))]
+            [
+                "python",
+                str(Path(__file__).parent.joinpath("train_lightning.py")),
+                "-cn",
+                f"{cfg.name}.yaml",
+            ]
         )
+        print(process.args)
         process.wait()
 
 

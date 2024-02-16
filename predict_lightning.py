@@ -1,12 +1,12 @@
 try:
+    import numpy as np
     from lib.lib_trainer_predictor_lightning import MyRegressor, MyDataloader
     import hydra
-    from lightning import Trainer, seed_everything
     from pathlib import Path
-    import numpy as np
     from lib.lib_utils import Utils
     import yaml
     import torch
+    from pytorch_lightning import seed_everything, Trainer
 
 except Exception as e:
     print(f"Some module are missing from {__file__}: {e}\n")

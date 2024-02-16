@@ -1,10 +1,8 @@
 try:
     from lib.lib_trainer_predictor_lightning import MyRegressor, MyDataloader
     import hydra
-    from lightning.pytorch.callbacks import ModelCheckpoint, EarlyStopping
     from pathlib import Path
     import time
-    from lightning import Trainer, seed_everything
     import yaml
     from torchsummary import summary
     import sys
@@ -12,6 +10,8 @@ try:
     import torch
     from torch import _dynamo
     import subprocess
+    from pytorch_lightning import seed_everything, Trainer
+    from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping
 
 
 except Exception as e:

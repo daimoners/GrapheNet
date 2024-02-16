@@ -6,9 +6,6 @@ try:
     from torch.utils.data import DataLoader
     import pandas as pd
     from pathlib import Path
-    from lightning import LightningModule, LightningDataModule
-    from lightning.pytorch.callbacks import RichProgressBar
-    from lightning.pytorch.callbacks.progress.rich_progress import RichProgressBarTheme
     from lib.lib_networks import (
         InceptionResNet,
         MySimpleNet,
@@ -18,12 +15,15 @@ try:
         MyDatasetCoulomb,
         get_resnet_model,
     )
+    import pytorch_lightning as pl
+    from pytorch_lightning.callbacks import RichProgressBar
+    from pytorch_lightning.callbacks.progress.rich_progress import RichProgressBarTheme
 
 except Exception as e:
     print(f"Some module are missing from {__file__}: {e}\n")
 
 
-class MyRegressor(LightningModule):
+class MyRegressor(pl.LightningModule):
     def __init__(self, cfg, config=None):
         super(MyRegressor, self).__init__()
 
@@ -263,7 +263,7 @@ class MyRegressor(LightningModule):
         return progress_bar
 
 
-class MyDataloader(LightningDataModule):
+class MyDataloader(pl.LightningDataModule):
     def __init__(self, cfg, config=None):
         super().__init__()
         self.package_path = Path(__file__).parent.parent

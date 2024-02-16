@@ -1,24 +1,22 @@
-name: train_predict_coulomb
 atom_types: 3
 cluster: true
-coulomb: true
+coulomb: false
 deterministic: true
-num_workers: 8
 enlargement_method: padding
-resolution: 1950
+name: train_predict_GO
+num_workers: 8
+resolution: 160
 target: formation_energy
 train:
   base_lr: 0.20911237334180677
-  batch_size: 4
-  compile: false
+  batch_size: 32
+  compile: true
+  dataset_path: data/training_dataset
   lr_list:
     Fermi_energy: 0.058841390814253124
     electron_affinity: 0.0428044113914066
     electronegativity: 0.04550807817481413
     formation_energy: 0.20911237334180677
     ionization_potential: 0.015186596128617183
-    total_energy: 0.014125999813258398
-    energy_per_atom: 0.06555071644078239
   matmul_precision: high
   num_epochs: 150
-  dataset_path: data/Coulomb_GO/training_dataset
