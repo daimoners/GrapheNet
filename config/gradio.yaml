@@ -1,0 +1,23 @@
+atom_types: 3
+cluster: false
+cluster_num_workers: 8
+coulomb: false
+deterministic: true
+enlargement_method: resize
+normalize: None
+num_workers: 6
+package_path: /home/tom/git_workspace/GrapheNet
+resolution: 160
+target: total_energy
+train:
+  base_lr: 0.0
+  batch_size: 32
+  compile: true
+  lr_list:
+    Fermi_energy: 0.09653253233375945
+    electron_affinity: 0.061813296683228255
+    electronegativity: 0.04048360377132749
+    ionization_potential: 0.02133368544635407
+    total_energy: 0.014135120055669028
+  matmul_precision: ""
+  num_epochs: 150

@@ -813,7 +813,24 @@ class Utils:
         plt.xlabel("Predictions")
         plt.ylabel("Targets")
         plt.title(f"{target} - R2 = {r2_score(y_hat,y):.3f}")
-        plt.savefig(str(dpath))
+        plt.savefig(str(dpath), dpi=300, bbox_inches="tight")
+
+    @staticmethod
+    def plot_loss_acc(values: list, dpath: Path, type: str = "Loss"):
+        epochs = list(range(1, len(values) + 1))
+
+        data = pd.DataFrame({"Epoch": epochs, f"{type}": values})
+
+        # Usa Seaborn per creare il grafico
+        plt.style.use("seaborn-v0_8-paper")
+        fig = plt.figure(figsize=(10, 7))
+        sns.lineplot(x="Epoch", y=f"{type}", data=data, marker="o")
+
+        # Aggiungi etichette e titolo
+        plt.xlabel("Epoch", fontsize=20)
+        plt.ylabel(f"{type}", fontsize=20)
+        plt.tick_params(axis="both", which="major", labelsize=20)
+        plt.savefig(str(dpath), dpi=300, bbox_inches="tight")
 
     @staticmethod
     def write_csv_results(
@@ -834,6 +851,8 @@ class Utils:
         df = df.sort_values(by=f"{target}_MAE", ascending=False)
 
         df.to_csv(dpath)
+
+        return df
 
     @staticmethod
     def drop_custom(
@@ -1157,7 +1176,7 @@ class Utils:
         return df_train, df_val, df_test
 
 
-class CoulombUtils:
+class CoulombUtils:  #!DEPRECATED
     @staticmethod
     def compute_coulomb_matrix(
         xyz_file: Path, dpath: Path, format: str = ".npy"
@@ -1299,9 +1318,11 @@ class CoulombUtils:
         pbar = tqdm(total=len(items))
 
         for i in items:
-            CoulombUtils.fast_compute_coulomb_matrix(
-                i, dpath
-            ) if fast else CoulombUtils.compute_coulomb_matrix(i, dpath)
+            (
+                CoulombUtils.fast_compute_coulomb_matrix(i, dpath)
+                if fast
+                else CoulombUtils.compute_coulomb_matrix(i, dpath)
+            )
             pbar.update(1)
         pbar.close()
 

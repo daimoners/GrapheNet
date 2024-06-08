@@ -1,0 +1,23 @@
+# PATHS
+package_path: /home/tommaso/git_workspace/GrapheNet
+
+dataset_path: ${package_path}/data_paper/cluster_310-350_Coulomb_GO/training_dataset
+target: formation_energy
+resolution: 350
+train_size: 2000
+val_size: 430
+test_size: 430
+
+# SLURM
+slurm_job_name: KRR_GrapheNet
+slurm_mem:
+slurm_ncpus: 16
+slurm_ngpus: 1
+slurm_nodelist:
+slurm_partition: long
+slurm_timeout: 2800
+slurm_output: outputs/slurm_out
+slurm_exclude: gn05,gn06,gn07
+
+# VERBOSITY
+verbose: True

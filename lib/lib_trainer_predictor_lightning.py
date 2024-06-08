@@ -19,7 +19,9 @@ try:
         MyDatasetPng,
         MyDatasetCoulomb,
         get_resnet_model,
+        CoulombNet,
     )
+    from icecream import ic
 
 except Exception as e:
     print(f"Some module are missing from {__file__}: {e}\n")
@@ -71,19 +73,39 @@ class MyRegressor(LightningModule):
         self.net = InceptionResNet(
             resolution=cfg.resolution,
             input_channels=3 if (not self.coulomb and self.atom_types > 1) else 1,
-            output_channels=(self.atom_types + 1)
-            if (self.target == "total_energy" or self.target == "formation_energy")
-            else 1,
+            output_channels=(
+                (self.atom_types + 1)
+                if (self.target == "total_energy" or self.target == "formation_energy")
+                else 1
+            ),
             filters=[16, 32, 64],
             dense_layers=[128, 64],
         )
 
+        # self.net = CoulombNet(
+        #     resolution=cfg.resolution,
+        #     output_channels=(
+        #         (self.atom_types + 1)
+        #         if (self.target == "total_energy" or self.target == "formation_energy")
+        #         else 1
+        #     ),
+        # )
+
         # self.net = get_resnet_model(
         #     in_channels=3 if (not self.coulomb and self.atom_types > 1) else 1,
-        #     out_channels=(self.atom_types + 1)
-        #     if (self.target == "total_energy" or self.target == "formation_energy")
-        #     else 1,
+        #     out_channels=(
+        #         (self.atom_types + 1)
+        #         if (self.target == "total_energy" or self.target == "formation_energy")
+        #         else 1
+        #     ),
         # )
+
+        self.train_loss_plot = []
+        self.train_acc_plot = []
+        self.val_loss_plot = []
+        self.val_acc_plot = []
+
+        self.cfg = cfg
 
         self.save_hyperparameters()
 
@@ -98,21 +120,30 @@ class MyRegressor(LightningModule):
             lr=self.learning_rate,
         )
 
-        return {
-            "optimizer": opt,
-            "lr_scheduler": {
-                "scheduler": torch.optim.lr_scheduler.ReduceLROnPlateau(
-                    opt,
-                    patience=20,
-                    verbose=True,
-                ),
-                "monitor": "val_loss",
-            },
-        }
+        if not self.cfg.kfold:
+            return {
+                "optimizer": opt,
+                "lr_scheduler": {
+                    "scheduler": torch.optim.lr_scheduler.ReduceLROnPlateau(
+                        opt,
+                        patience=20,
+                        verbose=True,
+                    ),
+                    "monitor": "val_loss",
+                },
+            }
+        else:
+            return {
+                "optimizer": opt,
+                "lr_scheduler": {
+                    "scheduler": torch.optim.lr_scheduler.StepLR(opt, step_size=33),
+                },
+            }
 
     def criterion(self, output, target, data):
         l2 = nn.MSELoss()
         if self.target == "total_energy" or self.target == "formation_energy":
+            output = torch.squeeze(output)
             if self.atom_types == 1:
                 output = output[:, 0] + data[:] * output[:, 1]
             elif self.atom_types == 2:
@@ -139,6 +170,7 @@ class MyRegressor(LightningModule):
 
     def accuracy(self, output, target, data, test_step=False):
         if self.target == "total_energy" or self.target == "formation_energy":
+            output = torch.squeeze(output)
             if self.atom_types == 1:
                 output = output[:, 0] + data[:] * output[:, 1]
             elif self.atom_types == 2:
@@ -200,6 +232,9 @@ class MyRegressor(LightningModule):
         loss = torch.stack(self.val_loss_step_holder).mean(dim=0)
         acc = torch.stack(self.val_acc_step_holder).mean(dim=0)
 
+        self.val_loss_plot.append(loss.item())
+        self.val_acc_plot.append(acc.item())
+
         self.log(
             "val_loss",
             loss,
@@ -212,6 +247,22 @@ class MyRegressor(LightningModule):
         self.log(
             "val_acc",
             acc,
+            on_epoch=True,
+            prog_bar=True,
+            logger=True,
+            on_step=False,
+            sync_dist=True,
+        )
+        if self.current_epoch > 0:
+            loss_difference = (
+                abs(self.train_loss_plot[-1] - self.val_loss_plot[-1])
+                + self.val_loss_plot[-1]
+            )
+        else:
+            loss_difference = np.inf
+        self.log(
+            "loss_difference",
+            loss_difference,
             on_epoch=True,
             prog_bar=True,
             logger=True,
@@ -233,6 +284,9 @@ class MyRegressor(LightningModule):
     def on_train_epoch_end(self):
         loss = torch.stack(self.train_loss_step_holder).mean(dim=0)
         acc = torch.stack(self.train_acc_step_holder).mean(dim=0)
+
+        self.train_loss_plot.append(loss.item())
+        self.train_acc_plot.append(acc.item())
 
         self.log(
             "train_loss",
@@ -256,6 +310,8 @@ class MyRegressor(LightningModule):
         self.train_loss_step_holder.clear()
         self.train_acc_step_holder.clear()
 
+        ic(f"Ended epoch: {self.current_epoch}")
+
     def on_test_start(self):
         self.errors.clear()
         self.plot_y.clear()
@@ -270,6 +326,10 @@ class MyRegressor(LightningModule):
                 "hp/batch_size": float(self.batch_size),
             }
         )
+        self.train_loss_plot.clear()
+        self.train_acc_plot.clear()
+        self.val_loss_plot.clear()
+        self.val_acc_plot.clear()
 
     @staticmethod
     def get_progressbar():
@@ -306,26 +366,47 @@ class MyDataloader(LightningDataModule):
         self.enlargement_method = cfg.enlargement_method
         self.coulomb = cfg.coulomb
 
+        self.cfg = cfg
+
     def setup(self, stage=None):
         train_dataset = pd.read_csv(Path(self.spath).joinpath("train", "train.csv"))
         val_dataset = pd.read_csv(Path(self.spath).joinpath("val", "val.csv"))
         test_dataset = pd.read_csv(Path(self.spath).joinpath("test", "test.csv"))
 
+        # train_dataset[self.target] = (
+        #     train_dataset[self.target] - train_dataset[self.target].min()
+        # ) / (train_dataset[self.target].max() - train_dataset[self.target].min())
+        # val_dataset[self.target] = (
+        #     val_dataset[self.target] - val_dataset[self.target].min()
+        # ) / (val_dataset[self.target].max() - val_dataset[self.target].min())
+        # test_dataset[self.target] = (
+        #     test_dataset[self.target] - test_dataset[self.target].min()
+        # ) / (test_dataset[self.target].max() - test_dataset[self.target].min())
+
         # collect the path of the .npy files for each set in order to generate the DataLoader objects
         train_paths = [
             f
             for f in Path(self.spath).joinpath("train").iterdir()
-            if (f.suffix == ".png" or f.suffix == ".npy")
+            if (
+                (f.suffix == ".png" and not self.cfg.coulomb)
+                or (f.suffix == ".npy" and self.cfg.coulomb)
+            )
         ]
         val_paths = [
             f
             for f in Path(self.spath).joinpath("val").iterdir()
-            if (f.suffix == ".png" or f.suffix == ".npy")
+            if (
+                (f.suffix == ".png" and not self.cfg.coulomb)
+                or (f.suffix == ".npy" and self.cfg.coulomb)
+            )
         ]
         test_paths = [
             f
             for f in Path(self.spath).joinpath("test").iterdir()
-            if (f.suffix == ".png" or f.suffix == ".npy")
+            if (
+                (f.suffix == ".png" and not self.cfg.coulomb)
+                or (f.suffix == ".npy" and self.cfg.coulomb)
+            )
         ]
 
         if self.coulomb:
@@ -381,9 +462,9 @@ class MyDataloader(LightningDataModule):
             self.train_data,
             batch_size=self.batch_size,
             shuffle=True,
-            num_workers=self.num_workers
-            if not self.cluster
-            else self.cluster_num_workers,
+            num_workers=(
+                self.num_workers if not self.cluster else self.cluster_num_workers
+            ),
             pin_memory=True,
             drop_last=True,
         )
@@ -393,9 +474,9 @@ class MyDataloader(LightningDataModule):
             self.val_data,
             batch_size=self.batch_size,
             shuffle=False,
-            num_workers=self.num_workers
-            if not self.cluster
-            else self.cluster_num_workers,
+            num_workers=(
+                self.num_workers if not self.cluster else self.cluster_num_workers
+            ),
             pin_memory=True,
             drop_last=True,
         )
@@ -405,9 +486,9 @@ class MyDataloader(LightningDataModule):
             self.test_data,
             batch_size=self.batch_size,
             shuffle=False,
-            num_workers=self.num_workers
-            if not self.cluster
-            else self.cluster_num_workers,
+            num_workers=(
+                self.num_workers if not self.cluster else self.cluster_num_workers
+            ),
             pin_memory=True,
             drop_last=True,
         )

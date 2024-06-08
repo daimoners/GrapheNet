@@ -4,24 +4,39 @@ cluster_num_workers: 8
 coulomb: false
 deterministic: true
 enlargement_method: padding
+kfold: false
 num_workers: 6
 package_path: /home/tommaso/git_workspace/GrapheNet
-resolution: 160
+resolution: 125
 sample: /home/tommaso/git_workspace/GrapheNet/featuremaps_visualization/neutral_15877/neutral_15877.png
-target: formation_energy
+target: Fermi_energy
 train:
-  base_lr: 0.20911237334180677
+  base_lr: 0.058841390814253124
   batch_size: 32
   compile: false
-  dpath: ${train.spath}/models/${target}
+  dpath: ${train.spath}/models_images/${target}
   lr_list:
-    Fermi_energy: 0.058841390814253124
-    electron_affinity: 0.0428044113914066
-    electronegativity: 0.04550807817481413
-    formation_energy: 0.20911237334180677
-    ionization_potential: 0.015186596128617183
-    total_energy: 0.014125999813258398
-    energy_per_atom: 0.05098795176736245
+    Fermi_energy: 0.01 #0.058841390814253124
+    electron_affinity: 0.01 #0.0428044113914066
+    electronegativity: 0.01 #0.04550807817481413
+    #energy_per_atom: 0.05098795176736245
+    formation_energy: 0.01 #0.20911237334180677
+    ionization_potential: 0.01 #0.015186596128617183
+    #total_energy: 0.014125999813258398
   matmul_precision: high
   num_epochs: 150
-  spath: ${package_path}/test/training_dataset_augmented
+  spath: ${package_path}/data_paper/cluster_310-660_Coulomb_GO/training_dataset
+
+# SLURM
+slurm_job_name: Images_GrapheNet
+slurm_mem:
+slurm_ncpus: 16
+slurm_ngpus: 1
+slurm_nodelist:
+slurm_partition: long
+slurm_timeout: 2800
+slurm_output: outputs/slurm_out
+slurm_exclude: gn05,gn06,gn07
+
+# VERBOSITY
+verbose: True

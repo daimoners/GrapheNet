@@ -25,8 +25,12 @@ def main(cfg):
         )
 
         print(f"Training for target: {target}")
+        # process = subprocess.Popen(
+        #     ["python", str(Path(__file__).parent.joinpath("train_lightning.py"))]
+        # )
+        # process.wait()
         process = subprocess.Popen(
-            ["python", str(Path(__file__).parent.joinpath("train_lightning.py"))]
+            ["python", str(Path(__file__).parent.joinpath("kfold_train_lightning.py"))]
         )
         process.wait()
 
@@ -36,17 +40,17 @@ def main(cfg):
         new_value=0.0,
     )
 
-    images = {}
-    for target in list(cfg.train.lr_list.keys()):
-        images[
-            str(
-                Path(cfg.train.spath).joinpath(
-                    "models", str(target), f"{target}_fit.png"
-                )
-            )
-        ] = Path(cfg.train.spath).joinpath("models", str(target), f"{target}_fit.png")
+    # images = {}
+    # for target in list(cfg.train.lr_list.keys()):
+    #     images[
+    #         str(
+    #             Path(cfg.train.spath).joinpath(
+    #                 "models", str(target), f"{target}_fit.png"
+    #             )
+    #         )
+    #     ] = Path(cfg.train.spath).joinpath("models", str(target), f"{target}_fit.png")
 
-    send_images(images)
+    # send_images(images)
 
 
 if __name__ == "__main__":

@@ -69,7 +69,7 @@ class DatasetGenerator(object):
 
         if min_num_atoms != 0:
             if isinstance(min_num_atoms, int):
-                df = df[df["atom_number_total"] > min_num_atoms]
+                df = df[df["atom_number_total"] >= min_num_atoms]
             elif isinstance(min_num_atoms, list):
                 df = df[
                     df["atom_number_total"].between(min_num_atoms[0], min_num_atoms[1])
@@ -121,14 +121,18 @@ class DatasetGenerator(object):
         self.path_csv = Path(cfg.path_csv)
         self.path_xyz = Path(cfg.path_xyz)
 
-        self.csv_dataset_path = Path(cfg.from_csv.csv_dataset_path)
+        self.csv_dataset_path = (
+            Path(cfg.from_csv.csv_dataset_path)
+            if cfg.from_csv.csv_dataset_path is not None
+            else Path()
+        )
 
         self.package_path = cfg.package_path
 
         self.stock_dataset_path = Path(cfg.stock_csv_path)
         self.n_items = cfg.randomly.n_items
         self.oxygen_outliers_th = cfg.randomly.oxygen_outliers_th
-        self.min_num_atoms = cfg.randomly.min_num_atoms
+        self.min_num_atoms = list(cfg.randomly.min_num_atoms)
         self.drop_custom_flag = cfg.randomly.drop_custom
 
         self.augmented_png = cfg.augmented_png
@@ -160,9 +164,13 @@ class DatasetGenerator(object):
             )
             if self.augmented_xyz:
                 DatasetGenerator.rotate_all_xyz(spath=self.path_xyz)
-        DatasetGenerator.generate_cropped_png_dataset_from_xyz(
-            spath=self.path_xyz, dpath=self.spath
-        ) if not self.spath.is_dir() else None
+        (
+            DatasetGenerator.generate_cropped_png_dataset_from_xyz(
+                spath=self.path_xyz, dpath=self.spath
+            )
+            if not self.spath.is_dir()
+            else None
+        )
         self.split_dataset()
         Utils.generate_num_atoms(dataset_path=self.dpath, xyz_path=self.path_xyz)
         Utils.find_max_dimensions_png_folder(spath=self.spath, dpath=self.dpath)

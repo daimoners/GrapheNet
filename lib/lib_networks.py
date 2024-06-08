@@ -15,6 +15,16 @@ try:
     )
     from PIL import Image
     import pandas as pd
+    from lib.lib_coulomb import (
+        read_xyz,
+        calculate_coulomb_matrix,
+        sort_by_row_norm,
+        standardize_matrix,
+        randomly_sort_matrix,
+        padd_matrix,
+        log_normalize,
+        compute_eigenvalues,
+    )
 
 except Exception as e:
     print(f"Some module are missing: {e}")
@@ -572,6 +582,50 @@ class DeepCNN(nn.Module):
         return out.size()[1]
 
 
+# class CoulombNet(nn.Module):
+#     def __init__(self, input_size):
+#         super(CoulombNet, self).__init__()
+#         self.fc1 = nn.Linear(input_size, 512)
+#         self.dropout1 = nn.Dropout(0.2)
+#         self.fc2 = nn.Linear(512, 256)
+#         self.dropout2 = nn.Dropout(0.2)
+#         self.fc3 = nn.Linear(256, 128)
+#         self.fc4 = nn.Linear(128, 1)  # Output layer for regression
+
+#     def forward(self, x):
+#         x = torch.relu(self.fc1(x))
+#         x = self.dropout1(x)
+#         x = torch.relu(self.fc2(x))
+#         x = self.dropout2(x)
+#         x = torch.relu(self.fc3(x))
+#         x = self.fc4(x)
+#         return x
+
+
+class CoulombNet(nn.Module):
+    def __init__(self, resolution, output_channels):
+        super(CoulombNet, self).__init__()
+        self.fc1 = nn.Linear(resolution**2, 4096)
+        self.fc6 = nn.Linear(4096, 2048)
+        self.fc7 = nn.Linear(2048, 1024)
+        self.fc8 = nn.Linear(1024, 512)
+        self.fc9 = nn.Linear(512, output_channels)
+
+        self.activation = nn.ReLU()
+
+    def forward(self, x):
+        x = self.activation(self.fc1(x))
+        # x = self.activation(self.fc2(x))
+        # x = self.activation(self.fc3(x))
+        # x = self.activation(self.fc4(x))
+        # x = self.activation(self.fc5(x))
+        x = self.activation(self.fc6(x))
+        x = self.activation(self.fc7(x))
+        x = self.activation(self.fc8(x))
+        x = self.fc9(x)
+        return x
+
+
 class MyDatasetPng:
     """Class that generate a dataset for DataLoader module, given as input the paths of the .png files and the respective labels"""
 
@@ -663,12 +717,39 @@ class MyDatasetCoulomb:
         return len(self.paths)
 
     def __getitem__(self, i):
-        coulomb = np.load((self.paths[i]).with_suffix(".npy"))
-        coulomb = coulomb / coulomb.max()  #!forse questo non ci va
-        # Create a new matrix with larger dimensions
-        coulomb_padded = np.zeros((self.resolution, self.resolution))
-        # Insert the original matrix into the upper left corner of the new matrix
-        coulomb_padded[: coulomb.shape[0], : coulomb.shape[1]] = coulomb
+        # atomic_numbers, coordinates = read_xyz(self.paths[i])
+        # coulomb = calculate_coulomb_matrix(atomic_numbers, coordinates)
+        coulomb = np.load(self.paths[i])
+        coulomb = sort_by_row_norm(coulomb)
+        # coulomb = randomly_sort_matrix(coulomb)
+
+        # === PADDING === #
+        coulomb = padd_matrix(coulomb, self.resolution)
+        # coulomb_padded = np.zeros((self.resolution, self.resolution))
+        # coulomb_padded[: coulomb.shape[0], : coulomb.shape[1]] = coulomb
+
+        # === NORMALIZATION === #
+        # coulomb = standardize_matrix(coulomb)
+        # coulomb = coulomb / np.max(coulomb)
+        # coulomb = log_normalize(coulomb)
+        # row_norms = np.linalg.norm(coulomb, axis=1, keepdims=True)
+        # row_norms[row_norms == 0] = 1e-10
+        # coulomb = coulomb / row_norms
+        # coulomb = coulomb / np.max(coulomb)
+
+        # === FLATTEN === #
+        # coulomb = coulomb.flatten()
+
+        # === EIGEN ===#
+        # coulomb = compute_eigenvalues(coulomb)
+        # coulomb = np.pad(
+        #     coulomb,
+        #     pad_width=(0, (self.resolution - len(coulomb))),
+        #     mode="constant",
+        #     constant_values=0,
+        # )
+        coulomb = (coulomb - np.min(coulomb)) / (np.max(coulomb) - np.min(coulomb))
+        # coulomb = log_normalize(coulomb)
 
         file_name = self.paths[i].stem
         index = self.df[self.df["file_name"] == file_name].index[0]
@@ -678,14 +759,14 @@ class MyDatasetCoulomb:
 
         if self.phase == "test":
             return (
-                torch.from_numpy(np.expand_dims(coulomb_padded.copy(), 0)).float(),
+                torch.from_numpy(np.expand_dims(coulomb.copy(), 0)).float(),
                 torch.from_numpy(n_atoms).float(),
                 torch.from_numpy(target_value).float(),
                 file_name,
             )
         else:
             return (
-                torch.from_numpy(np.expand_dims(coulomb_padded.copy(), 0)).float(),
+                torch.from_numpy(np.expand_dims(coulomb.copy(), 0)).float(),
                 torch.from_numpy(n_atoms).float(),
                 torch.from_numpy(target_value).float(),
             )
