@@ -234,7 +234,7 @@ def start(cfg):
 
     write_results_yaml(cfg)
     write_results_yaml(cfg, data={"model_name": get_model_name(model)})
-    # save_model_summary(cfg, model)
+    save_model_summary(cfg, model)
 
     start = time.time()
     (

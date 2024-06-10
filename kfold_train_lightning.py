@@ -23,6 +23,10 @@ try:
     import numpy as np
     import yaml
     import math
+    import submitit
+    from icecream import ic
+    from omegaconf import open_dict
+    from telegram_bot import send_message
 
 
 except Exception as e:
@@ -113,6 +117,9 @@ def main(cfg):
     elif cfg.train.matmul_precision == "medium":
         torch.set_float32_matmul_precision("medium")
 
+    with open_dict(cfg):
+        cfg.train.base_lr = cfg.train.lr_list[cfg.target]
+
     seed_everything(42, workers=True)
 
     # early_stopping = EarlyStopping(
@@ -120,8 +127,8 @@ def main(cfg):
     # )
 
     df = pd.read_csv(Path(cfg.train.spath).joinpath("dataset.csv"))
-    folds = round(1 + math.log2(len(df)))
-    # folds = 6
+    # folds = round(1 + math.log2(len(df)))
+    folds = 6
     kfold = KFold(n_splits=folds, shuffle=True)
     images_path = Path(cfg.train.spath).joinpath("images")
 
@@ -339,6 +346,9 @@ def main(cfg):
         "w",
     ) as outfile:
         yaml.dump(data, outfile, indent=4)
+
+    message = f"Prediction on target `{cfg.target}` completed for Kfolds ✅"
+    send_message(message, parse_mode="MarkdownV2")
 
 
 if __name__ == "__main__":

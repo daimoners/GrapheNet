@@ -1,12 +1,20 @@
 # PATHS
 package_path: /home/tommaso/git_workspace/GrapheNet
 
-dataset_path: ${package_path}/data_paper/cluster_310-350_Coulomb_GO/training_dataset
-target: formation_energy
+dataset_path: ${package_path}/data_final/Coulomb_GO/cluster_310-350/training_dataset
+#dpath: ${dataset_path}/matrices_KRR
+dpath: /home/tommaso/git_workspace/prova/${model}
 resolution: 350
-train_size: 2000
-val_size: 430
-test_size: 430
+target_list:
+  [
+    "Fermi_energy",
+    "electron_affinity",
+    "electronegativity",
+    "formation_energy",
+    "ionization_potential",
+  ]
+model: XGBoost #XGBoost, LinearRegression or KRR
+eigenvalues: false
 
 # SLURM
 slurm_job_name: KRR_GrapheNet

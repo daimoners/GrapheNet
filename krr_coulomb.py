@@ -18,10 +18,12 @@ try:
         padd_matrix,
         calculate_coulomb_matrix,
         read_xyz,
+        compute_eigenvalues,
     )
     import xgboost as xgb
     import yaml
     import time
+    from telegram_bot import send_message
 
 except Exception as e:
     print(f"Some module are missing from {__file__}: {e}\n")
@@ -64,141 +66,165 @@ def main(args):
 
 
 def krr(args):
+    target_list = list(args.target_list)
 
-    # === Dataset Train === #
-    train_df = pd.read_csv(Path(args.dataset_path).joinpath("train", "train.csv"))
-    # train_df = train_df[: args.train_size]
-    samples = [
-        f.stem
-        for f in Path(args.dataset_path).joinpath("train").iterdir()
-        if f.suffix.lower() == ".npy"
-    ]
-    train_df = train_df.loc[train_df["file_name"].isin(samples)]
-    train_values = train_df[f"{args.target}"].values
-    train_matrices = np.empty((len(samples), args.resolution**2), dtype=np.ndarray)
-    matrices_paths = [
-        f
-        for f in Path(args.dataset_path).joinpath("train").iterdir()
-        if f.suffix.lower() == ".npy"
-    ]
-    pbar = tqdm(total=len(matrices_paths))
-    for i, m in enumerate(matrices_paths):
-        matrix = np.load(m)
-        matrix = sort_by_row_norm(matrix)
-        matrix = padd_matrix(matrix, args.resolution)
-        matrix = (matrix - np.min(matrix)) / (np.max(matrix) - np.min(matrix))
-        matrix = matrix.flatten()
-        train_matrices[i] = matrix
-        pbar.update(1)
-        pbar.refresh()
-    pbar.close()
+    for target in target_list:
 
-    # === Dataset Test === #
-    test_df = pd.read_csv(Path(args.dataset_path).joinpath("test", "test.csv"))
-    # test_df = test_df[: args.test_size]
-    samples = [
-        f.stem
-        for f in Path(args.dataset_path).joinpath("test").iterdir()
-        if f.suffix.lower() == ".npy"
-    ]
-    test_df = test_df.loc[test_df["file_name"].isin(samples)]
-    test_names = test_df["file_name"].to_list()
-    test_values = test_df[f"{args.target}"].values
-    test_matrices = np.empty((len(samples), args.resolution**2), dtype=np.ndarray)
-    matrices_paths = [
-        f
-        for f in Path(args.dataset_path).joinpath("test").iterdir()
-        if f.suffix.lower() == ".npy"
-    ]
-    pbar = tqdm(total=len(matrices_paths))
-    for i, m in enumerate(matrices_paths):
-        matrix = np.load(m)
-        matrix = sort_by_row_norm(matrix)
-        matrix = padd_matrix(matrix, args.resolution)
-        matrix = (matrix - np.min(matrix)) / (np.max(matrix) - np.min(matrix))
-        matrix = matrix.flatten()
-        test_matrices[i] = matrix
-        pbar.update(1)
-        pbar.refresh()
-    pbar.close()
+        # === Dataset Train === #
+        train_df = pd.read_csv(Path(args.dataset_path).joinpath("train", "train.csv"))
+        # train_df = train_df[: args.train_size]
+        samples = [
+            f.stem
+            for f in Path(args.dataset_path).joinpath("train").iterdir()
+            if f.suffix.lower() == ".npy"
+        ]
+        train_df = train_df.loc[train_df["file_name"].isin(samples)]
+        train_values = train_df[f"{target}"].values
+        train_matrices = np.empty(
+            (len(samples), args.resolution if args.eigenvalues else args.resolution**2),
+            dtype=np.ndarray,
+        )
+        matrices_paths = [
+            f
+            for f in Path(args.dataset_path).joinpath("train").iterdir()
+            if f.suffix.lower() == ".npy"
+        ]
+        pbar = tqdm(total=len(matrices_paths))
+        for i, m in enumerate(matrices_paths):
+            matrix = np.load(m)
+            matrix = sort_by_row_norm(matrix)
+            matrix = padd_matrix(matrix, args.resolution)
+            if args.eigenvalues:
+                matrix = compute_eigenvalues(matrix)
+                matrix = (matrix - np.min(matrix)) / (np.max(matrix) - np.min(matrix))
+            else:
+                matrix = (matrix - np.min(matrix)) / (np.max(matrix) - np.min(matrix))
+                matrix = matrix.flatten()
+            train_matrices[i] = matrix
+            pbar.update(1)
+            pbar.refresh()
+        pbar.close()
 
-    # === Kernel Ridge Regression ===#
-    # krr = KernelRidge(kernel="rbf", alpha=1.0, gamma=None)
-    # krr.fit(train_matrices, train_values)
-    # y_pred = krr.predict(test_matrices)
+        # === Dataset Test === #
+        test_df = pd.read_csv(Path(args.dataset_path).joinpath("test", "test.csv"))
+        # test_df = test_df[: args.test_size]
+        samples = [
+            f.stem
+            for f in Path(args.dataset_path).joinpath("test").iterdir()
+            if f.suffix.lower() == ".npy"
+        ]
+        test_df = test_df.loc[test_df["file_name"].isin(samples)]
+        test_names = test_df["file_name"].to_list()
+        test_values = test_df[f"{target}"].values
+        test_matrices = np.empty(
+            (len(samples), args.resolution if args.eigenvalues else args.resolution**2),
+            dtype=np.ndarray,
+        )
+        matrices_paths = [
+            f
+            for f in Path(args.dataset_path).joinpath("test").iterdir()
+            if f.suffix.lower() == ".npy"
+        ]
+        pbar = tqdm(total=len(matrices_paths))
+        for i, m in enumerate(matrices_paths):
+            matrix = np.load(m)
+            matrix = sort_by_row_norm(matrix)
+            matrix = padd_matrix(matrix, args.resolution)
+            if args.eigenvalues:
+                matrix = compute_eigenvalues(matrix)
+                matrix = (matrix - np.min(matrix)) / (np.max(matrix) - np.min(matrix))
+            else:
+                matrix = (matrix - np.min(matrix)) / (np.max(matrix) - np.min(matrix))
+                matrix = matrix.flatten()
+            test_matrices[i] = matrix
+            pbar.update(1)
+            pbar.refresh()
+        pbar.close()
 
-    # === Linear Regression ===#
-    # model = LinearRegression()
-    # model.fit(train_matrices, train_values)
-    # y_pred = model.predict(test_matrices)
+        # === Kernel Ridge Regression ===#
+        if args.model == "KRR":
+            print("KRR")
+            krr = KernelRidge(kernel="rbf", alpha=1.0, gamma=None)
+            start = time.time()
+            krr.fit(train_matrices, train_values)
+            end = time.time()
+            y_pred = krr.predict(test_matrices)
 
-    # === XGBoost === #
-    dtrain = xgb.DMatrix(train_matrices, label=train_values)
-    dtest = xgb.DMatrix(test_matrices)
+        # === Linear Regression ===#
+        elif args.model == "LinearRegression":
+            print("LinearRegression")
+            model = LinearRegression()
+            start = time.time()
+            model.fit(train_matrices, train_values)
+            end = time.time()
+            y_pred = model.predict(test_matrices)
 
-    # Configura i parametri per XGBoost
-    params = {
-        "objective": "reg:squarederror",  # Per la regressione
-        "eval_metric": "rmse",  # Metrica di valutazione
-        "eta": 0.1,  # Tasso di apprendimento
-        "max_depth": 6,  # Profondità massima dell'albero
-        "subsample": 0.8,  # Frazione di campioni da utilizzare per l'addestramento di ciascun albero
-        "colsample_bytree": 0.8,  # Frazione di features da utilizzare per l'addestramento di ciascun albero
-        "tree_method": "hist",
-        "device": "cuda",
-        "reg_alpha": 0.1,  # regolarizzazione L1
-        "reg_lambda": 0.1,  # regolarizzazione L2
-    }
+        # === XGBoost === #
+        elif args.model == "XGBoost":
+            print("XGBoost")
+            dtrain = xgb.DMatrix(train_matrices, label=train_values)
+            dtest = xgb.DMatrix(test_matrices)
 
-    # Addestra il modello XGBoost
-    num_rounds = 150  # Numero di iterazioni di boosting
-    start = time.time()
-    bst = xgb.train(params, dtrain, num_rounds)
-    end = time.time()
+            # Configura i parametri per XGBoost
+            params = {
+                "objective": "reg:squarederror",  # Per la regressione
+                "eval_metric": "rmse",  # Metrica di valutazione
+                "eta": 0.1,  # Tasso di apprendimento
+                "max_depth": 6,  # Profondità massima dell'albero
+                "subsample": 0.8,  # Frazione di campioni da utilizzare per l'addestramento di ciascun albero
+                "colsample_bytree": 0.8,  # Frazione di features da utilizzare per l'addestramento di ciascun albero
+                "tree_method": "hist",
+                "device": "cuda",
+                "reg_alpha": 0.1,  # regolarizzazione L1
+                "reg_lambda": 0.1,  # regolarizzazione L2
+            }
 
-    # Effettua le predizioni
-    y_pred = bst.predict(dtest)
+            # Addestra il modello XGBoost
+            num_rounds = 150  # Numero di iterazioni di boosting
+            start = time.time()
+            bst = xgb.train(params, dtrain, num_rounds)
+            end = time.time()
 
-    Utils.plot_fit(
-        y=test_values,
-        y_hat=y_pred,
-        dpath=Path(
-            f"/home/tommaso/git_workspace/GrapheNet/krr/XGB_fit_{args.target}.png"
-        ),
-        target=args.target,
-    )
+            # Effettua le predizioni
+            y_pred = bst.predict(dtest)
 
-    df = Utils.write_csv_results(
-        y=test_values,
-        y_hat=y_pred,
-        names=test_names,
-        dpath=Path(
-            f"/home/tommaso/git_workspace/GrapheNet/krr/XGB_fit_{args.target}.csv"
-        ),
-        target=args.target,
-    )
+        else:
+            raise Exception(f"Unknown model: {args.model}")
 
-    performance = {
-        "training_time": float((end - start) / 60),
-        "Maximum % error": float(np.max(df[f"{args.target}_MAE"])),
-        "Mean % error": float(np.mean(df[f"{args.target}_MAE"])),
-        "STD % error": float(np.std(df[f"{args.target}_MAE"])),
-    }
+        dpath = Path(args.dpath)
+        dpath.mkdir(exist_ok=True, parents=True)
 
-    with open(
-        f"/home/tommaso/git_workspace/GrapheNet/krr/XGB_{args.target}_prediction_results.yaml",
-        "w",
-    ) as outfile:
-        yaml.dump(performance, outfile)
+        Utils.plot_fit(
+            y=test_values,
+            y_hat=y_pred,
+            dpath=dpath.joinpath(f"fit_{target}_{args.model}.png"),
+            target=target,
+        )
+
+        df = Utils.write_csv_results(
+            y=test_values,
+            y_hat=y_pred,
+            names=test_names,
+            dpath=dpath.joinpath(f"results_{target}_{args.model}.csv"),
+            target=target,
+        )
+
+        performance = {
+            "training_time": float((end - start) / 60),
+            "Maximum % error": float(np.max(df[f"{target}_MAE"])),
+            "Mean % error": float(np.mean(df[f"{target}_MAE"])),
+            "STD % error": float(np.std(df[f"{target}_MAE"])),
+        }
+
+        with open(
+            str(dpath.joinpath(f"prediction_results_{target}_{args.model}.yaml")),
+            "w",
+        ) as outfile:
+            yaml.dump(performance, outfile)
+
+        message = f"Prediction on target `{target}` completed for KRR ✅"
+        send_message(message, parse_mode="MarkdownV2", disable_notification=True)
 
 
 if __name__ == "__main__":
-    # args = OmegaConf.create(
-    #     {
-    #         "dataset_path": "/home/tommaso/git_workspace/GrapheNet/data_paper/subset_Coulomb_GO/training_dataset",
-    #         "target": "ionization_potential",
-    #         "resolution": 1263,
-    #     }
-    # )
-    # krr(args)
     main()

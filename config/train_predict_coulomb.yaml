@@ -14,7 +14,7 @@ train:
   base_lr: 0.0428044113914066
   batch_size: 32
   compile: false
-  dpath: ${train.spath}/models_norm_padd_max_InceptionResnet/${target}
+  dpath: ${train.spath}/matrices_models_norm_padd_max_${train.network}/${target}
   lr_list:
     Fermi_energy: 0.01 #0.058841390814253124
     electron_affinity: 0.01 #0.0428044113914066
@@ -25,7 +25,9 @@ train:
     #energy_per_atom: 0.06555071644078239
   matmul_precision: high
   num_epochs: 150
-  spath: ${package_path}/data_paper/cluster_310-660_Coulomb_GO/training_dataset
+  spath: ${package_path}/data_final/Coulomb_GO/cluster_310-660/training_dataset
+  grayscale: false
+  network: InceptionResNet #CNN, InceptionResNet or Resnet18
 
 # SLURM
 slurm_job_name: Coulomb_GrapheNet

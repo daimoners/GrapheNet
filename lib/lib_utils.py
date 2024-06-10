@@ -140,15 +140,6 @@ class Utils:
             y_max = x[0][1]
             y_min = x[1][1]
 
-            resolution = round(
-                4
-                * (
-                    5
-                    + np.max(
-                        [np.abs(x_max), np.abs(x_min), np.abs(y_max), np.abs(y_min)]
-                    )
-                )
-            )
         else:
             path = spath.parent.joinpath("max_min_coordinates.txt")
 
@@ -163,15 +154,12 @@ class Utils:
             z_max = x[0][2]
             z_min = x[1][2]
 
-            resolution = round(
-                4
-                * (
-                    5
-                    + np.max(
-                        [np.abs(x_max), np.abs(x_min), np.abs(y_max), np.abs(y_min)]
-                    )
-                )
-            )
+        resolution = round(
+            4 * (5 + np.max([np.abs(x_max - x_min), np.abs(y_max - y_min)]))
+        )
+
+        X = X - x_min
+        Y = Y - y_min
 
         C = np.zeros((resolution, resolution))
         O = np.zeros((resolution, resolution))
@@ -181,47 +169,20 @@ class Utils:
 
         C_only = True
 
-        count = 0
-
         for i in range(len(X)):
+            x_coord = round(X[i] * 2) + round(resolution / 2 - np.abs(x_max - x_min))
+            y_coord = round(Y[i] * 2) + round(resolution / 2 - np.abs(y_max - y_min))
             if atoms[i] == "C":
-                x_coord = int(round(X[i] * 2) + resolution / 2)
-                y_coord = int(round(Y[i] * 2) + resolution / 2)
                 if C[y_coord, x_coord] < z_norm(Z[i]):
                     C[y_coord, x_coord] = z_norm(Z[i])
-                # if C[y_coord, x_coord] == 0:
-                #     C[y_coord, x_coord] = z_norm(Z[i])
-                # elif Utils.find_first_empty_cell(C, x=x_coord, y=y_coord) is not None:            #! Qui ho provato a eliminare gli overlaps spostando l'atomo sovrapposto in un pixel adiacente, ma non ho trovato miglioramenti
-                #     adj_x, adj_y = Utils.find_first_empty_cell(C, x=x_coord, y=y_coord)
-                #     C[adj_y, adj_x] = z_norm(Z[i])
-                # else:
-                #     count += 1
             elif atoms[i] == "O":
                 C_only = False
-                x_coord = int(round(X[i] * 2) + resolution / 2)
-                y_coord = int(round(Y[i] * 2) + resolution / 2)
                 if O[y_coord, x_coord] < z_norm(Z[i]):
                     O[y_coord, x_coord] = z_norm(Z[i])
-                # if O[y_coord, x_coord] == 0:
-                #     O[y_coord, x_coord] = z_norm(Z[i])
-                # elif Utils.find_first_empty_cell(O, x=x_coord, y=y_coord) is not None:
-                #     adj_x, adj_y = Utils.find_first_empty_cell(O, x=x_coord, y=y_coord)
-                #     O[adj_y, adj_x] = z_norm(Z[i])
-                # else:
-                #     count += 1
             elif atoms[i] == "H":
                 C_only = False
-                x_coord = int(round(X[i] * 2) + resolution / 2)
-                y_coord = int(round(Y[i] * 2) + resolution / 2)
                 if H[y_coord, x_coord] < z_norm(Z[i]):
                     H[y_coord, x_coord] = z_norm(Z[i])
-                # if H[y_coord, x_coord] == 0:
-                #     H[y_coord, x_coord] = z_norm(Z[i])
-                # elif Utils.find_first_empty_cell(H, x=x_coord, y=y_coord) is not None:
-                #     adj_x, adj_y = Utils.find_first_empty_cell(H, x=x_coord, y=y_coord)
-                #     H[adj_y, adj_x] = z_norm(Z[i])
-                # else:
-                #     count += 1
 
         name = spath.stem
 
@@ -247,8 +208,6 @@ class Utils:
 
             image = Image.fromarray(Matrix)
             Utils.crop_image(image, name + ".png", dpath)
-
-            return count
 
     @staticmethod
     def generate_grayscale_png(

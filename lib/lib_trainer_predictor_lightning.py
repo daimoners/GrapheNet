@@ -31,6 +31,8 @@ class MyRegressor(LightningModule):
     def __init__(self, cfg, config=None):
         super(MyRegressor, self).__init__()
 
+        self.cfg = cfg
+
         self.learning_rate = cfg.train.base_lr if config is None else config["lr"]
         self.target = cfg.target
         self.atom_types = cfg.atom_types
@@ -51,61 +53,62 @@ class MyRegressor(LightningModule):
 
         self.min_val_loss = float("inf")
 
-        # self.net = MySimpleNet(
-        #     resolution=cfg.resolution,
-        #     input_channels=3 if (not self.coulomb and self.atom_types > 1) else 1,
-        #     output_channels=(self.atom_types + 1)
-        #     if (self.target == "total_energy" or self.target == "formation_energy")
-        #     else 1,
-        # )
-        # self.net = MySimpleResNet(
-        #     resolution=cfg.resolution,
-        #     input_channels=3 if (not self.coulomb and self.atom_types > 1) else 1,
-        #     output_channels=(self.atom_types + 1)
-        #     if (self.target == "total_energy" or self.target == "formation_energy")
-        #     else 1,
-        # )
-        # self.net = DeepCNN(
-        #     resolution=cfg.resolution,
-        #     input_channels=self.atom_types,
-        #     output_channels=(self.atom_types + 1) if (self.target == "total_energy" or self.target == "formation_energy") else 1
-        # )
-        self.net = InceptionResNet(
-            resolution=cfg.resolution,
-            input_channels=3 if (not self.coulomb and self.atom_types > 1) else 1,
-            output_channels=(
-                (self.atom_types + 1)
-                if (self.target == "total_energy" or self.target == "formation_energy")
-                else 1
-            ),
-            filters=[16, 32, 64],
-            dense_layers=[128, 64],
-        )
+        self.grayscale = cfg.train.grayscale
 
-        # self.net = CoulombNet(
-        #     resolution=cfg.resolution,
-        #     output_channels=(
-        #         (self.atom_types + 1)
-        #         if (self.target == "total_energy" or self.target == "formation_energy")
-        #         else 1
-        #     ),
-        # )
+        if self.cfg.train.network == "CNN":
+            self.net = MySimpleNet(
+                resolution=cfg.resolution,
+                input_channels=3 if (not self.coulomb and self.atom_types > 1) else 1,
+                output_channels=(
+                    (self.atom_types + 1)
+                    if (
+                        self.target == "total_energy"
+                        or self.target == "formation_energy"
+                    )
+                    else 1
+                ),
+            )
 
-        # self.net = get_resnet_model(
-        #     in_channels=3 if (not self.coulomb and self.atom_types > 1) else 1,
-        #     out_channels=(
-        #         (self.atom_types + 1)
-        #         if (self.target == "total_energy" or self.target == "formation_energy")
-        #         else 1
-        #     ),
-        # )
+        elif self.cfg.train.network == "InceptionResNet":
+            self.net = InceptionResNet(
+                resolution=cfg.resolution,
+                input_channels=(
+                    3
+                    if (not (self.coulomb or self.grayscale) and self.atom_types > 1)
+                    else 1
+                ),
+                output_channels=(
+                    (self.atom_types + 1)
+                    if (
+                        self.target == "total_energy"
+                        or self.target == "formation_energy"
+                    )
+                    else 1
+                ),
+                filters=[16, 32, 64],
+                dense_layers=[128, 64],
+            )
+
+        elif self.cfg.train.network == "Resnet18":
+            self.net = get_resnet_model(
+                in_channels=3 if (not self.coulomb and self.atom_types > 1) else 1,
+                out_channels=(
+                    (self.atom_types + 1)
+                    if (
+                        self.target == "total_energy"
+                        or self.target == "formation_energy"
+                    )
+                    else 1
+                ),
+            )
+
+        else:
+            raise Exception(f"Network {self.cfg.train.network} not found!")
 
         self.train_loss_plot = []
         self.train_acc_plot = []
         self.val_loss_plot = []
         self.val_acc_plot = []
-
-        self.cfg = cfg
 
         self.save_hyperparameters()
 
@@ -439,6 +442,7 @@ class MyDataloader(LightningDataModule):
                 resolution=self.resolution,
                 enlargement_method=self.enlargement_method,
                 phase="train",
+                grayscale=self.cfg.train.grayscale,
             )
             self.val_data = MyDatasetPng(
                 val_paths,
@@ -447,6 +451,7 @@ class MyDataloader(LightningDataModule):
                 resolution=self.resolution,
                 enlargement_method=self.enlargement_method,
                 phase="val",
+                grayscale=self.cfg.train.grayscale,
             )
             self.test_data = MyDatasetPng(
                 test_paths,
@@ -455,6 +460,7 @@ class MyDataloader(LightningDataModule):
                 resolution=self.resolution,
                 enlargement_method=self.enlargement_method,
                 phase="test",
+                grayscale=self.cfg.train.grayscale,
             )
 
     def train_dataloader(self):

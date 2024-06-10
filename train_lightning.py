@@ -61,7 +61,11 @@ def save_model_summary(cfg: dict, model: MyRegressor):
     sys.stdout = captured
     summary(
         model.net.cuda(),
-        (cfg.atom_types if not cfg.coulomb else 1, cfg.resolution, cfg.resolution),
+        (
+            cfg.atom_types if not (cfg.coulomb or cfg.train.grayscale) else 1,
+            cfg.resolution,
+            cfg.resolution,
+        ),
         batch_size=cfg.train.batch_size,
         device="cuda",
     )

@@ -637,6 +637,7 @@ class MyDatasetPng:
         resolution=160,
         enlargement_method="padding",
         phase="train",
+        grayscale=False,
     ):
         self.paths = paths
         self.df = df
@@ -645,12 +646,16 @@ class MyDatasetPng:
         self.enlargement_method = enlargement_method
 
         self.phase = phase
+        self.grayscale = grayscale
 
     def __len__(self):
         return len(self.paths)
 
     def __getitem__(self, i):
-        img = cv2.imread(str(self.paths[i]), -1)
+        if self.grayscale:
+            img = cv2.imread(str(self.paths[i]), 0)
+        else:
+            img = cv2.imread(str(self.paths[i]), -1)
         if self.enlargement_method == "padding":
             img = Utils.padding_image(img, size=self.resolution)
         elif self.enlargement_method == "resize":

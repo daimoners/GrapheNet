@@ -156,6 +156,7 @@ class DatasetGenerator(object):
                 dpath=self.path_xyz,
             )
         else:
+            print("CSV found")
             DatasetGenerator.copy_xyz_files(
                 csv_path=self.csv_dataset_path,
                 spath=self.stock_dataset_path.parent,
