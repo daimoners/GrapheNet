@@ -72,23 +72,19 @@ def krr(args):
 
         # === Dataset Train === #
         train_df = pd.read_csv(Path(args.dataset_path).joinpath("train", "train.csv"))
-        # train_df = train_df[: args.train_size]
-        samples = [
-            f.stem
-            for f in Path(args.dataset_path).joinpath("train").iterdir()
-            if f.suffix.lower() == ".npy"
+        train_names = train_df["file_name"].to_list()
+        matrices_paths = [
+            Path(args.dataset_path).joinpath("train", f"{name}.npy")
+            for name in train_names
         ]
-        train_df = train_df.loc[train_df["file_name"].isin(samples)]
         train_values = train_df[f"{target}"].values
         train_matrices = np.empty(
-            (len(samples), args.resolution if args.eigenvalues else args.resolution**2),
+            (
+                len(train_names),
+                args.resolution if args.eigenvalues else args.resolution**2,
+            ),
             dtype=np.ndarray,
         )
-        matrices_paths = [
-            f
-            for f in Path(args.dataset_path).joinpath("train").iterdir()
-            if f.suffix.lower() == ".npy"
-        ]
         pbar = tqdm(total=len(matrices_paths))
         for i, m in enumerate(matrices_paths):
             matrix = np.load(m)
@@ -107,24 +103,19 @@ def krr(args):
 
         # === Dataset Test === #
         test_df = pd.read_csv(Path(args.dataset_path).joinpath("test", "test.csv"))
-        # test_df = test_df[: args.test_size]
-        samples = [
-            f.stem
-            for f in Path(args.dataset_path).joinpath("test").iterdir()
-            if f.suffix.lower() == ".npy"
-        ]
-        test_df = test_df.loc[test_df["file_name"].isin(samples)]
         test_names = test_df["file_name"].to_list()
+        matrices_paths = [
+            Path(args.dataset_path).joinpath("test", f"{name}.npy")
+            for name in test_names
+        ]
         test_values = test_df[f"{target}"].values
         test_matrices = np.empty(
-            (len(samples), args.resolution if args.eigenvalues else args.resolution**2),
+            (
+                len(test_names),
+                args.resolution if args.eigenvalues else args.resolution**2,
+            ),
             dtype=np.ndarray,
         )
-        matrices_paths = [
-            f
-            for f in Path(args.dataset_path).joinpath("test").iterdir()
-            if f.suffix.lower() == ".npy"
-        ]
         pbar = tqdm(total=len(matrices_paths))
         for i, m in enumerate(matrices_paths):
             matrix = np.load(m)
