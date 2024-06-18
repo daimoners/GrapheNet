@@ -1,10 +1,10 @@
 # PATHS
 package_path: /home/tommaso/git_workspace/GrapheNet
 
-dataset_path: ${package_path}/data_final/Coulomb_GO/cluster_310-350/training_dataset
+dataset_path: ${package_path}/data_final/Coulomb_GO/cluster_310-660/training_dataset
 #dpath: ${dataset_path}/matrices_KRR
-dpath: /home/tommaso/git_workspace/prova/${model}
-resolution: 350
+dpath: ${dataset_path}/eigen_KRR/${model}
+resolution: 660
 target_list:
   [
     "Fermi_energy",
@@ -14,7 +14,7 @@ target_list:
     "ionization_potential",
   ]
 model: XGBoost #XGBoost, LinearRegression or KRR
-eigenvalues: false
+eigenvalues: true
 
 # SLURM
 slurm_job_name: KRR_GrapheNet

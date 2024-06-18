@@ -4,6 +4,7 @@ try:
     import matplotlib.pyplot as plt
     from lib.lib_utils import Utils
     from numba import jit
+    from sklearn.preprocessing import StandardScaler
 
 except Exception as e:
     print(f"Some module are missing: {e}\n")
@@ -207,6 +208,9 @@ def standardize_matrix(matrix):
     mean = np.mean(matrix, axis=0)
     std_dev = np.std(matrix, axis=0)
     standardized_matrix = (matrix - mean) / std_dev
+
+    # scaler = StandardScaler()
+    # standardized_matrix = scaler.fit_transform(matrix)
     return standardized_matrix
 
 

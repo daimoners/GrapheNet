@@ -69,7 +69,7 @@ def krr(args):
     target_list = list(args.target_list)
 
     for target in target_list:
-
+        start = time.time()
         # === Dataset Train === #
         train_df = pd.read_csv(Path(args.dataset_path).joinpath("train", "train.csv"))
         train_names = train_df["file_name"].to_list()
@@ -88,18 +88,84 @@ def krr(args):
         pbar = tqdm(total=len(matrices_paths))
         for i, m in enumerate(matrices_paths):
             matrix = np.load(m)
-            matrix = sort_by_row_norm(matrix)
-            matrix = padd_matrix(matrix, args.resolution)
+            # matrix = sort_by_row_norm(matrix)
+            # matrix = padd_matrix(matrix, args.resolution)
+            matrix = np.pad(
+                matrix,
+                (0, (args.resolution - len(matrix))),
+                "constant",
+                constant_values=0,
+            )
             if args.eigenvalues:
-                matrix = compute_eigenvalues(matrix)
-                matrix = (matrix - np.min(matrix)) / (np.max(matrix) - np.min(matrix))
+                # matrix = compute_eigenvalues(matrix)
+                if args.model == "KRR":
+                    matrix = standardize_matrix(matrix)
+                else:
+                    matrix = (matrix - np.min(matrix)) / (
+                        np.max(matrix) - np.min(matrix)
+                    )
             else:
-                matrix = (matrix - np.min(matrix)) / (np.max(matrix) - np.min(matrix))
-                matrix = matrix.flatten()
+                if args.model == "KRR":
+                    matrix = standardize_matrix(matrix)
+                else:
+                    matrix = (matrix - np.min(matrix)) / (
+                        np.max(matrix) - np.min(matrix)
+                    )
+                # matrix = matrix.flatten()
             train_matrices[i] = matrix
             pbar.update(1)
             pbar.refresh()
         pbar.close()
+
+        # === Dataset Val === #
+        val_df = pd.read_csv(Path(args.dataset_path).joinpath("val", "val.csv"))
+        val_names = val_df["file_name"].to_list()
+        matrices_paths = [
+            Path(args.dataset_path).joinpath("val", f"{name}.npy") for name in val_names
+        ]
+        val_values = val_df[f"{target}"].values
+        val_matrices = np.empty(
+            (
+                len(val_names),
+                args.resolution if args.eigenvalues else args.resolution**2,
+            ),
+            dtype=np.ndarray,
+        )
+        pbar = tqdm(total=len(matrices_paths))
+        for i, m in enumerate(matrices_paths):
+            matrix = np.load(m)
+            # matrix = sort_by_row_norm(matrix)
+            # matrix = padd_matrix(matrix, args.resolution)
+            matrix = np.pad(
+                matrix,
+                (0, (args.resolution - len(matrix))),
+                "constant",
+                constant_values=0,
+            )
+            if args.eigenvalues:
+                # matrix = compute_eigenvalues(matrix)
+                if args.model == "KRR":
+                    matrix = standardize_matrix(matrix)
+                else:
+                    matrix = (matrix - np.min(matrix)) / (
+                        np.max(matrix) - np.min(matrix)
+                    )
+            else:
+                if args.model == "KRR":
+                    matrix = standardize_matrix(matrix)
+                else:
+                    matrix = (matrix - np.min(matrix)) / (
+                        np.max(matrix) - np.min(matrix)
+                    )
+                # matrix = matrix.flatten()
+            val_matrices[i] = matrix
+            pbar.update(1)
+            pbar.refresh()
+        pbar.close()
+
+        # === Merge Train and Val Dataset === #
+        train_values = np.concatenate((train_values, val_values))
+        train_matrices = np.vstack((train_matrices, val_matrices))
 
         # === Dataset Test === #
         test_df = pd.read_csv(Path(args.dataset_path).joinpath("test", "test.csv"))
@@ -119,14 +185,30 @@ def krr(args):
         pbar = tqdm(total=len(matrices_paths))
         for i, m in enumerate(matrices_paths):
             matrix = np.load(m)
-            matrix = sort_by_row_norm(matrix)
-            matrix = padd_matrix(matrix, args.resolution)
+            # matrix = sort_by_row_norm(matrix)
+            # matrix = padd_matrix(matrix, args.resolution)
+            matrix = np.pad(
+                matrix,
+                (0, (args.resolution - len(matrix))),
+                "constant",
+                constant_values=0,
+            )
             if args.eigenvalues:
-                matrix = compute_eigenvalues(matrix)
-                matrix = (matrix - np.min(matrix)) / (np.max(matrix) - np.min(matrix))
+                # matrix = compute_eigenvalues(matrix)
+                if args.model == "KRR":
+                    matrix = standardize_matrix(matrix)
+                else:
+                    matrix = (matrix - np.min(matrix)) / (
+                        np.max(matrix) - np.min(matrix)
+                    )
             else:
-                matrix = (matrix - np.min(matrix)) / (np.max(matrix) - np.min(matrix))
-                matrix = matrix.flatten()
+                if args.model == "KRR":
+                    matrix = standardize_matrix(matrix)
+                else:
+                    matrix = (matrix - np.min(matrix)) / (
+                        np.max(matrix) - np.min(matrix)
+                    )
+                # matrix = matrix.flatten()
             test_matrices[i] = matrix
             pbar.update(1)
             pbar.refresh()
@@ -135,19 +217,15 @@ def krr(args):
         # === Kernel Ridge Regression ===#
         if args.model == "KRR":
             print("KRR")
-            krr = KernelRidge(kernel="rbf", alpha=1.0, gamma=None)
-            start = time.time()
+            krr = KernelRidge(kernel="linear", alpha=1.0, gamma=None)
             krr.fit(train_matrices, train_values)
-            end = time.time()
             y_pred = krr.predict(test_matrices)
 
         # === Linear Regression ===#
         elif args.model == "LinearRegression":
             print("LinearRegression")
             model = LinearRegression()
-            start = time.time()
             model.fit(train_matrices, train_values)
-            end = time.time()
             y_pred = model.predict(test_matrices)
 
         # === XGBoost === #
@@ -172,9 +250,7 @@ def krr(args):
 
             # Addestra il modello XGBoost
             num_rounds = 150  # Numero di iterazioni di boosting
-            start = time.time()
             bst = xgb.train(params, dtrain, num_rounds)
-            end = time.time()
 
             # Effettua le predizioni
             y_pred = bst.predict(dtest)
@@ -182,6 +258,7 @@ def krr(args):
         else:
             raise Exception(f"Unknown model: {args.model}")
 
+        end = time.time()
         dpath = Path(args.dpath)
         dpath.mkdir(exist_ok=True, parents=True)
 

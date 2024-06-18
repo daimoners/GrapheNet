@@ -102,6 +102,19 @@ class MyRegressor(LightningModule):
                 ),
             )
 
+        elif self.cfg.train.network == "CoulombNet":
+            self.net = CoulombNet(
+                resolution=cfg.resolution,
+                output_channels=(
+                    (self.atom_types + 1)
+                    if (
+                        self.target == "total_energy"
+                        or self.target == "formation_energy"
+                    )
+                    else 1
+                ),
+            )
+
         else:
             raise Exception(f"Network {self.cfg.train.network} not found!")
 
