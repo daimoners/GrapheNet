@@ -145,11 +145,11 @@ class Utils:
 
             x = np.loadtxt(str(path))
 
-            x_max = x[0][0]
-            x_min = x[1][0]
+            x_max = np.max(X)
+            x_min = np.min(X)
 
-            y_max = x[0][1]
-            y_min = x[1][1]
+            y_max = np.max(Y)
+            y_min = np.min(Y)
 
             z_max = x[0][2]
             z_min = x[1][2]

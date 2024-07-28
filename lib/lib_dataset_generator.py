@@ -132,7 +132,9 @@ class DatasetGenerator(object):
         self.stock_dataset_path = Path(cfg.stock_csv_path)
         self.n_items = cfg.randomly.n_items
         self.oxygen_outliers_th = cfg.randomly.oxygen_outliers_th
-        self.min_num_atoms = list(cfg.randomly.min_num_atoms)
+        self.min_num_atoms = (
+            list(cfg.randomly.min_num_atoms) if cfg.randomly.min_num_atoms != 0 else 0
+        )
         self.drop_custom_flag = cfg.randomly.drop_custom
 
         self.augmented_png = cfg.augmented_png
