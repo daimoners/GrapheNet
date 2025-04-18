@@ -9,11 +9,13 @@ The paper is about using computer vision techniques (and in particular convoluti
    │ ├── config/ 
    │ │ ├── dataset.yaml  --> contain the config to create the dataset
    │ │ ├── train_predict_coulomb.yaml  --> contain the config to train on Coulomb eigenvalues
+   │ │ ├── train_predict_coulomb.yaml  --> contain the config to train on png images with k-folds cross-validation
    │ │ └── train_predict.yaml    --> contain the config to train on png images
    │ ├── data/    --> contain the dataset and all the data (downloaded from the point 3 of the setup below)
    │ ├── lib/     --> contain all the necessary libraries for the dataset creation, models definition and training algorithms
    │ ├── outputs/ (folder created by hydra containing the experiments hystory)
    │ ├── environment.yml
+   │ ├── kfold_train_lightning.py  --> script to train the model with k-folds cross-validation
    │ ├── dataset_generator.py  --> script to generate the png dataset from the xyz files
    │ ├── coulomb_predict_lightning.py    --> main script to evaluate the trained models on Coulomb eigenvalues
    │ ├── coulomb_train_lightning.py    --> main script to train the models on Coulomb eigenvalues
@@ -92,16 +94,16 @@ The paper is about using computer vision techniques (and in particular convoluti
       network: specify the model to use for training/inference.
       ```
 
-### Training
+### Training with png
 
 Launch the `train_lightning.py`:
 
    ```bash
    python train_lightning.py 
    ```
-At the end of the training phase, the framework generates a yaml file containig some training parameters (batch_size, dataset, learning_rate, num_epochs, resolution, target, model_name) and the training time, along with the best checkpoints.
+At the end of the training phase, the framework generates a yaml file containing some training parameters (batch_size, dataset, learning_rate, num_epochs, resolution, target, model_name) and the training time, along with the best checkpoints.
 
-### Evaluation
+### Evaluation with png
 
 The evaluation is automatically performed at the end of the training. If you want to perform again the evaluation on the test set, launch the `predict_lightning.py` with the appropriate hydra config file:
 
@@ -115,16 +117,16 @@ At the end of the evaluation phase, the framework generates:
    * a yaml file containing the MEAN, MAX and STD value of the MAE errors.
 
 
-### (Optional) Training on Coulomb eigenvalues
+### (Optional) Training with Coulomb eigenvalues
 
 Modify the desired target inside the `train_predict_coulomb.yaml` from the `config` folder according to your needs and launch the `coulomb_train_lightning.py`:
 
    ```bash
    python coulomb_train_lightning.py 
    ```
-At the end of the training phase, the framework generates a yaml file containig some training parameters (batch_size, dataset, learning_rate, num_epochs, resolution, target, model_name) and the training time, along with the best checkpoints.
+At the end of the training phase, the framework generates a yaml file containing some training parameters (batch_size, dataset, learning_rate, num_epochs, resolution, target, model_name) and the training time, along with the best checkpoints.
 
-### (Optional) Evaluation on Coulomb eigenvalues
+### (Optional) Evaluation with Coulomb eigenvalues
 
 The evaluation is automatically performed at the end of the training. If you want to perform again the evaluation on the test set, launch the `coulomb_predict_lightning.py` with the appropriate hydra config file:
 
@@ -136,3 +138,12 @@ At the end of the evaluation phase, the framework generates:
    * the png images of the learning curves
    * a csv file containing for each sample of the test set, the predicted value, the real labelled value and the MAE errors.
    * a yaml file containing the MEAN, MAX and STD value of the MAE errors.
+
+### (Optional) Training with png images and k-folds cross-validation
+
+Modify the desired target inside the `train_predict_kfold.yaml` from the `config` folder according to your needs and launch the `kfold_train_lightning.py`:
+
+   ```bash
+   python kfold_train_lightning.py
+   ```
+At the end of the training phase, the framework generates a yaml file containing some training parameters (batch_size, dataset, learning_rate, num_epochs, resolution, target, model_name) and the training time, along with the best checkpoints for each fold (default: 6 folds). It also provides a YAML file containing the MEAN, MAX, and STD values of the MAE errors averaged over the 6 folds.

@@ -17,6 +17,7 @@ try:
     from torch.utils.data import DataLoader
     from omegaconf import open_dict
     import numpy as np
+    from icecream import ic
 
 
 except Exception as e:
@@ -100,15 +101,17 @@ def get_kfold_results(folds_path: Path, target: str):
     return np.mean(max), np.mean(mean), np.mean(std)
 
 
-@hydra.main(version_base="1.2", config_path="config", config_name="train_predict")
+@hydra.main(version_base="1.2", config_path="config", config_name="train_predict_kfold")
 def main(cfg):
+    if cfg.verbose:
+        ic.enable()
+    else:
+        ic.disable()
+
     if cfg.train.matmul_precision == "high":
         torch.set_float32_matmul_precision("high")
     elif cfg.train.matmul_precision == "medium":
         torch.set_float32_matmul_precision("medium")
-
-    with open_dict(cfg):
-        cfg.train.base_lr = cfg.train.lr_list[cfg.target]
 
     seed_everything(42, workers=True)
 
@@ -214,7 +217,7 @@ def main(cfg):
 
         write_results_yaml(cfg)
         write_results_yaml(cfg, data={"model_name": get_model_name(model)})
-        save_model_summary(cfg, model)
+        # save_model_summary(cfg, model)
 
         start = time.time()
         (
