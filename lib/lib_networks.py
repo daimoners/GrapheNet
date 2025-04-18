@@ -1,11 +1,15 @@
 try:
-    import numpy as np
     import torch.nn as nn
     import torch
     import torchvision.models as models
     import cv2
+    import numpy as np
     from lib.lib_utils import Utils
-
+    from lib.lib_coulomb import (
+        sort_by_row_norm,
+        padd_matrix,
+    )
+    from torch.utils.data import Dataset
 
 except Exception as e:
     print(f"Some module are missing: {e}")
@@ -31,17 +35,21 @@ def get_resnet_model(in_channels, out_channels):
 class InceptionBlock(nn.Module):
     def __init__(self, in_channels, out_channels):
         super(InceptionBlock, self).__init__()
-
+        # Convolutional layers
         self.conv1 = nn.Conv2d(in_channels, out_channels, kernel_size=1)
         self.conv3 = nn.Conv2d(in_channels, out_channels, kernel_size=3, padding=1)
         self.conv5 = nn.Conv2d(in_channels, out_channels, kernel_size=5, padding=2)
 
-    def forward(self, x):
+        # self.conv1 = nn.Conv2d(in_channels, out_channels, kernel_size=3, padding=1)
+        # self.conv3 = nn.Conv2d(in_channels, out_channels, kernel_size=5, padding=2)
+        # self.conv5 = nn.Conv2d(in_channels, out_channels, kernel_size=7, padding=3)
 
+    def forward(self, x):
+        # Apply the convolutional layers and max pooling in parallel
         x1 = self.conv1(x)
         x3 = self.conv3(x)
         x5 = self.conv5(x)
-
+        # Concatenate the resulting feature maps along the channel axis
         x_out = torch.cat([x1, x3, x5], dim=1)
         return x_out
 
@@ -56,7 +64,7 @@ class InceptionResNet(nn.Module):
             32,
             64,
             128,
-        ],
+        ],  # § i migliori risultati li ho ottenuti con [32, 64, 128] e [256, 128]
         dense_layers: list = [256, 128],
     ):
         super(InceptionResNet, self).__init__()
@@ -350,6 +358,108 @@ class MySimpleResNet(nn.Module):
         return x.size()[1]
 
 
+class MySimpleResNetWithDistribution(nn.Module):
+    def __init__(self, resolution=160, input_channels=1, output_channels=2):
+        super(MySimpleResNetWithDistribution, self).__init__()
+
+        self.conv128 = nn.Conv2d(
+            in_channels=input_channels, out_channels=64, kernel_size=3
+        )
+        self.batchnorm1 = nn.BatchNorm2d(self.conv128.out_channels)
+        self.max_pool = nn.MaxPool2d(2, 2)
+        self.conv256_1 = nn.Conv2d(
+            in_channels=self.conv128.out_channels,
+            out_channels=128,
+            kernel_size=3,
+            padding=1,
+        )
+        self.conv256_2 = nn.Conv2d(
+            in_channels=self.conv256_1.out_channels,
+            out_channels=128,
+            kernel_size=3,
+            padding=1,
+        )
+        self.batchnorm2 = nn.BatchNorm2d(self.conv256_2.out_channels)
+        self.conv512_1 = nn.Conv2d(
+            in_channels=self.conv256_2.out_channels,
+            out_channels=256,
+            kernel_size=3,
+            padding=1,
+        )
+        self.conv512_2 = nn.Conv2d(
+            in_channels=self.conv512_1.out_channels,
+            out_channels=256,
+            kernel_size=3,
+            padding=1,
+        )
+        self.batchnorm3 = nn.BatchNorm2d(self.conv512_2.out_channels)
+
+        self.flatten = nn.Flatten()
+        self.relu = nn.ReLU()
+
+        self.downsample_1 = nn.Sequential(
+            nn.Conv2d(64, 128, kernel_size=1, bias=False),
+            nn.BatchNorm2d(128),
+        )
+
+        self.downsample_2 = nn.Sequential(
+            nn.Conv2d(128, 256, kernel_size=1, bias=False),
+            nn.BatchNorm2d(256),
+        )
+
+        self.fc1 = nn.Linear(self.find_dimenstion(resolution, input_channels), 512)
+        self.batchnorm4 = nn.BatchNorm1d(self.fc1.out_features)
+        self.dropout = nn.Dropout(0.5)
+        self.fc2 = nn.Linear(self.fc1.out_features, 256)
+        self.batchnorm5 = nn.BatchNorm1d(self.fc2.out_features)
+        self.fc3 = nn.Linear(self.fc2.out_features, output_channels)
+
+    def forward(self, input1, input2):
+        x = self.conv128(input1)
+        x = self.relu(self.batchnorm1(x))
+        x = self.max_pool(x)
+        residual = x
+        x = self.conv256_1(x)
+        x = self.conv256_2(x)
+        x = self.relu(self.batchnorm2(x)) + self.downsample_1(residual)
+        x = self.max_pool(x)
+        residual = x
+        x = self.conv512_1(x)
+        x = self.conv512_2(x)
+        x = self.relu(self.batchnorm3(x)) + self.downsample_2(residual)
+        x = self.max_pool(x)
+        x = self.flatten(x)
+        x = self.fc1(
+            torch.cat((x, input2), dim=1)
+        )  # TODO forse va concatenato quando la dimensione della prima parte è 3/4 volte la dimensione della distribuzione (24/32 se la dimensione della distribuzione è 8)
+        x = self.relu(self.batchnorm4(x))
+        x = self.dropout(x)
+        x = self.fc2(x)
+        x = self.relu(self.batchnorm5(x))
+
+        return self.fc3(x)
+
+    def find_dimenstion(self, resolution, input_channels):
+        x = torch.rand(1, input_channels, resolution, resolution)
+
+        x = self.conv128(x)
+        x = self.relu(self.batchnorm1(x))
+        x = self.max_pool(x)
+        residual = x
+        x = self.conv256_1(x)
+        x = self.conv256_2(x)
+        x = self.relu(self.batchnorm2(x)) + self.downsample_1(residual)
+        x = self.max_pool(x)
+        residual = x
+        x = self.conv512_1(x)
+        x = self.conv512_2(x)
+        x = self.relu(self.batchnorm3(x)) + self.downsample_2(residual)
+        x = self.max_pool(x)
+        x = self.flatten(x)
+
+        return x.size()[1] + 8
+
+
 class DeepCNN(nn.Module):
     #  Determine what layers and their order in CNN object
     def __init__(
@@ -457,6 +567,42 @@ class DeepCNN(nn.Module):
         return out.size()[1]
 
 
+# class CoulombNet(nn.Module):
+#     def __init__(self, input_size):
+#         super(CoulombNet, self).__init__()
+#         self.fc1 = nn.Linear(input_size, 512)
+#         self.dropout1 = nn.Dropout(0.2)
+#         self.fc2 = nn.Linear(512, 256)
+#         self.dropout2 = nn.Dropout(0.2)
+#         self.fc3 = nn.Linear(256, 128)
+#         self.fc4 = nn.Linear(128, 1)  # Output layer for regression
+
+#     def forward(self, x):
+#         x = torch.relu(self.fc1(x))
+#         x = self.dropout1(x)
+#         x = torch.relu(self.fc2(x))
+#         x = self.dropout2(x)
+#         x = torch.relu(self.fc3(x))
+#         x = self.fc4(x)
+#         return x
+
+
+class CoulombNet(nn.Module):
+    def __init__(self, resolution, output_channels):
+        super(CoulombNet, self).__init__()
+        self.fc1 = nn.Linear(resolution, resolution)
+        self.fc2 = nn.Linear(resolution, 140)
+        self.fc3 = nn.Linear(140, output_channels)
+
+        self.activation = nn.ReLU()
+
+    def forward(self, x):
+        x = self.activation(self.fc1(x))
+        x = self.activation(self.fc2(x))
+        x = self.fc3(x)
+        return x
+
+
 class MyDatasetPng:
     """Class that generate a dataset for DataLoader module, given as input the paths of the .png files and the respective labels"""
 
@@ -468,6 +614,7 @@ class MyDatasetPng:
         resolution=160,
         enlargement_method="padding",
         phase="train",
+        grayscale=False,
     ):
         self.paths = paths
         self.df = df
@@ -476,12 +623,16 @@ class MyDatasetPng:
         self.enlargement_method = enlargement_method
 
         self.phase = phase
+        self.grayscale = grayscale
 
     def __len__(self):
         return len(self.paths)
 
     def __getitem__(self, i):
-        img = cv2.imread(str(self.paths[i]), -1)
+        if self.grayscale:
+            img = cv2.imread(str(self.paths[i]), 0)
+        else:
+            img = cv2.imread(str(self.paths[i]), -1)
         if self.enlargement_method == "padding":
             img = Utils.padding_image(img, size=self.resolution)
         elif self.enlargement_method == "resize":
@@ -548,12 +699,52 @@ class MyDatasetCoulomb:
         return len(self.paths)
 
     def __getitem__(self, i):
-        coulomb = np.load((self.paths[i]).with_suffix(".npy"))
-        coulomb = coulomb / coulomb.max()
+        # atomic_numbers, coordinates = read_xyz(self.paths[i])
+        # coulomb = calculate_coulomb_matrix(atomic_numbers, coordinates)
+        coulomb = np.load(self.paths[i])
+        if len(coulomb.shape) > 1:
+            coulomb = sort_by_row_norm(coulomb)
+            # coulomb = randomly_sort_matrix(coulomb)
 
-        coulomb_padded = np.zeros((self.resolution, self.resolution))
+            # === PADDING === #
+            coulomb = padd_matrix(coulomb, self.resolution)
+            # coulomb_padded = np.zeros((self.resolution, self.resolution))
+            # coulomb_padded[: coulomb.shape[0], : coulomb.shape[1]] = coulomb
 
-        coulomb_padded[: coulomb.shape[0], : coulomb.shape[1]] = coulomb
+            # === NORMALIZATION === #
+            # coulomb = standardize_matrix(coulomb)
+            # coulomb = coulomb / np.max(coulomb)
+            # coulomb = log_normalize(coulomb)
+            # row_norms = np.linalg.norm(coulomb, axis=1, keepdims=True)
+            # row_norms[row_norms == 0] = 1e-10
+            # coulomb = coulomb / row_norms
+            # coulomb = coulomb / np.max(coulomb)
+
+            # === FLATTEN === #
+            # coulomb = coulomb.flatten()
+
+            # === EIGEN ===#
+            # coulomb = compute_eigenvalues(coulomb)
+            # coulomb = np.pad(
+            #     coulomb,
+            #     pad_width=(0, (self.resolution - len(coulomb))),
+            #     mode="constant",
+            #     constant_values=0,
+            # )
+            coulomb = (coulomb - np.min(coulomb)) / (np.max(coulomb) - np.min(coulomb))
+            # coulomb = log_normalize(coulomb)
+
+            tensor = torch.from_numpy(np.expand_dims(coulomb.copy(), 0)).float()
+        else:
+            coulomb = np.pad(
+                coulomb,
+                (0, (self.resolution - len(coulomb))),
+                "constant",
+                constant_values=0,
+            )
+            coulomb = (coulomb - np.min(coulomb)) / (np.max(coulomb) - np.min(coulomb))
+
+            tensor = torch.from_numpy(coulomb.copy()).float()
 
         file_name = self.paths[i].stem
         index = self.df[self.df["file_name"] == file_name].index[0]
@@ -563,18 +754,72 @@ class MyDatasetCoulomb:
 
         if self.phase == "test":
             return (
-                torch.from_numpy(np.expand_dims(coulomb_padded.copy(), 0)).float(),
+                tensor,
                 torch.from_numpy(n_atoms).float(),
                 torch.from_numpy(target_value).float(),
                 file_name,
             )
         else:
             return (
-                torch.from_numpy(np.expand_dims(coulomb_padded.copy(), 0)).float(),
+                tensor,
+                torch.from_numpy(n_atoms).float(),
+                torch.from_numpy(target_value).float(),
+            )
+
+
+class MyDatasetEGAT(Dataset):
+    def __init__(self, paths, df, target, phase):
+        self.graphs_paths = paths
+        self.df = df
+        self.target = target
+        self.phase = phase
+
+    def __len__(self):
+        return len(self.graphs_paths)
+
+    def __getitem__(self, i):
+        tensor = torch.load(str(self.graphs_paths[i]))
+
+        file_name = self.graphs_paths[i].stem
+
+        index = self.df[self.df["file_name"] == file_name].index[0]
+
+        target_value = np.array(float(self.df.loc[index, self.target]))
+
+        file_name = self.graphs_paths[i].stem
+
+        n_atoms = np.loadtxt(
+            (self.graphs_paths[i]).with_name(f"{self.graphs_paths[i].stem}.txt")
+        )
+
+        if self.phase == "test":
+            return (
+                tensor,
+                torch.from_numpy(n_atoms).float(),
+                torch.from_numpy(target_value).float(),
+                file_name,
+            )
+        else:
+            return (
+                tensor,
                 torch.from_numpy(n_atoms).float(),
                 torch.from_numpy(target_value).float(),
             )
 
 
 if __name__ == "__main__":
-    pass
+    # x = torch.rand(32, 3, 160, 160)
+
+    # net = InceptionResNet(input_channels=3, output_channels=4)
+
+    # y = net(x)
+
+    # print(y.shape)
+
+    x = torch.rand(32, 1, 1949, 1949)
+
+    net = InceptionResNet(input_channels=1, output_channels=4)
+
+    y = net(x)
+
+    print(y.shape)

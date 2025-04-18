@@ -38,7 +38,6 @@ def write_results_yaml(cfg: dict, data: dict = None):
             "learning_rate": cfg.train.base_lr,
             "batch_size": cfg.train.batch_size,
             "dataset": cfg.train.spath,
-            "resolution": cfg.resolution,
         }
         with open(
             str(Path(cfg.train.dpath).joinpath(f"{cfg.target}_train_results.yaml")), "w"
@@ -54,16 +53,20 @@ def write_results_yaml(cfg: dict, data: dict = None):
 def save_model_summary(cfg: dict, model: MyRegressor):
     captured = io.StringIO()
     sys.stdout = captured
-    summary(
-        model.net.cuda(),
-        (
-            cfg.atom_types if not (cfg.coulomb or cfg.train.grayscale) else 1,
-            cfg.resolution,
-            cfg.resolution,
-        ),
-        batch_size=cfg.train.batch_size,
-        device="cuda",
-    )
+    try:
+        summary(
+            model.net.cuda(),
+            (cfg.atom_types if not cfg.coulomb else 1, cfg.resolution, cfg.resolution),
+            batch_size=cfg.train.batch_size,
+            device="cuda",
+        )
+    except:
+        summary(
+            model.net.cuda(),
+            (cfg.atom_types if not cfg.coulomb else 1, cfg.resolution**2),
+            batch_size=cfg.train.batch_size,
+            device="cuda",
+        )
     sys.stdout = sys.__stdout__
 
     with open(str(Path(cfg.train.dpath).joinpath("model_summary.txt")), "w") as f:
@@ -110,7 +113,9 @@ def get_difference_checkpoint_name(checkpoints_path: Path):
     return str(best_loss[0])
 
 
-@hydra.main(version_base="1.2", config_path="config", config_name="train_predict")
+@hydra.main(
+    version_base="1.2", config_path="config", config_name="train_predict_coulomb"
+)
 def main(cfg):
     if cfg.verbose:
         ic.enable()
@@ -193,11 +198,9 @@ def start(cfg):
             accelerator="gpu",
             num_nodes=1,
             devices=1,
-            # strategy="ddp",
             max_epochs=cfg.train.num_epochs,
             callbacks=[
                 checkpoint_callback,
-                # model.get_progressbar(),
                 early_stopping,
                 last_checkpoint_callback,
                 loss_difference_checkpoint_callback,
@@ -223,7 +226,7 @@ def start(cfg):
 
     write_results_yaml(cfg)
     write_results_yaml(cfg, data={"model_name": get_model_name(model)})
-    # save_model_summary(cfg, model)
+    save_model_summary(cfg, model)
 
     start = time.time()
     (
