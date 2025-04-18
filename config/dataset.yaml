@@ -1,6 +1,6 @@
-package_path: "/home/tommaso/git_workspace/GrapheNet"
-data_path: "${package_path}/TEMP"
-stock_csv_path: "/home/tommaso/xyz_files_GO/dataset_with_formation_energy.csv"
+package_path: "/home/tom/git_workspace/tesi/GrapheNet"
+stock_csv_path: "/mnt/hdd/Università/dataset_GrapheNet_final/xyz_files_GO/dataset_with_formation_energy.csv"
+data_path: "${package_path}/data"
 path_xyz: "${data_path}/xyz_files/"
 path_csv: "${path_xyz}/dataset.csv"
 spath: "${data_path}/png_files"
@@ -18,14 +18,13 @@ augmented_png: false
 augmented_xyz: false
 
 randomly:
-  n_items: 0
+  n_items: 7000
   train_split: 0.7
   val_split: 0.15
   test_split: 0.15
   shuffle: True
-  oxygen_outliers_th: 0.0
-  min_num_atoms: 0 #[310, 660]
-  drop_custom: False
+  oxygen_outliers_th: 0.2
+  min_num_atoms: 0
 
 from_csv:
-  csv_dataset_path: "/home/tommaso/git_workspace/GrapheNet/data_test/data_GO/training_dataset_reference/dataset.csv"
+  csv_dataset_path: #"${data_path}/paper_training_dataset_reference/dataset.csv"

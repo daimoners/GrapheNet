@@ -122,14 +122,11 @@ def main(cfg):
     else:
         ic.disable()
 
-    for target in list(cfg.train.lr_list.keys()):
-        if Path(cfg.train.dpath).parent.joinpath(target).is_dir():
-            continue
+    if Path(cfg.train.dpath).parent.joinpath(cfg.target).is_dir():
+        print(f"WARNING: Model already trained for target: {cfg.target}")
+        return
 
-        with open_dict(cfg):
-            cfg.target = target
-            cfg.train.base_lr = cfg.train.lr_list[target]
-
+    if cfg.cluster:
         executor = submitit.AutoExecutor(
             folder=str(Path(cfg.slurm_output)),
             slurm_max_num_timeout=30,
@@ -153,7 +150,9 @@ def main(cfg):
         executor.update_parameters(name=f"{cfg.slurm_job_name}")
         slurm_auto_dftb = SLURM_GrapheNet(cfg)
         job = executor.submit(slurm_auto_dftb)
-        print(f"Submitted job_id: {job.job_id} for target: {target}")
+        print(f"Submitted job_id: {job.job_id} for target: {cfg.target}")
+    else:
+        start(cfg)
 
 
 def start(cfg):
@@ -174,18 +173,6 @@ def start(cfg):
         monitor="val_loss",
         filename="best_loss_{val_loss:.5f}_{epoch}",
     )
-    loss_difference_checkpoint_callback = ModelCheckpoint(
-        dirpath=cfg.train.dpath,
-        save_top_k=1,
-        monitor="loss_difference",
-        filename="loss_difference_{loss_difference:.5f}_{epoch}",
-    )
-    last_checkpoint_callback = ModelCheckpoint(
-        dirpath=cfg.train.dpath,
-        save_top_k=1,
-        every_n_epochs=1,
-        filename="last_{epoch}",
-    )
     early_stopping = EarlyStopping(
         monitor="val_loss", patience=45, verbose=True, check_on_train_epoch_end=False
     )
@@ -202,8 +189,6 @@ def start(cfg):
             callbacks=[
                 checkpoint_callback,
                 early_stopping,
-                last_checkpoint_callback,
-                loss_difference_checkpoint_callback,
             ],
             enable_progress_bar=False,
             log_every_n_steps=1,
@@ -218,8 +203,6 @@ def start(cfg):
                 checkpoint_callback,
                 model.get_progressbar(),
                 early_stopping,
-                last_checkpoint_callback,
-                loss_difference_checkpoint_callback,
             ],
             log_every_n_steps=1,
         )
@@ -315,98 +298,8 @@ def start(cfg):
         target=cfg.target,
     )
 
-    # === LAST CHECKPOINT ===#
-    checkpoints = get_last_checkpoint_name(Path(cfg.train.dpath))
-
-    trainer.test(
-        model,
-        datamodule=dataloaders,
-        ckpt_path=checkpoints,
-    )
-    print("Maximum % error = {:.5f}%".format(np.max(model.errors)))
-    print("Mean % error = {:.5f}%".format(np.mean(model.errors)))
-    print("STD % error = {:.5f}%\n".format(np.std(model.errors)))
-
-    performance = {
-        "Maximum % error": float(np.max(model.errors)),
-        "Mean % error": float(np.mean(model.errors)),
-        "STD % error": float(np.std(model.errors)),
-    }
-
-    with open(
-        str(
-            Path(cfg.train.dpath).joinpath(
-                f"last_{cfg.target}_prediction_results.yaml",
-            )
-        ),
-        "w",
-    ) as outfile:
-        yaml.dump(performance, outfile)
-
-    Utils.plot_fit(
-        y=model.plot_y,
-        y_hat=model.plot_y_hat,
-        dpath=Path(cfg.train.dpath).joinpath(f"last_{cfg.target}_fit.png"),
-        target=cfg.target,
-    )
-
-    Utils.write_csv_results(
-        y=model.plot_y,
-        y_hat=model.plot_y_hat,
-        names=model.sample_names,
-        dpath=Path(cfg.train.dpath).joinpath(
-            f"last_{cfg.target}_prediction_results.csv"
-        ),
-        target=cfg.target,
-    )
-
-    # === LOSS DIFFERENCE CHECKPOINT ===#
-    checkpoints = get_difference_checkpoint_name(Path(cfg.train.dpath))
-
-    trainer.test(
-        model,
-        datamodule=dataloaders,
-        ckpt_path=checkpoints,
-    )
-    print("Maximum % error = {:.5f}%".format(np.max(model.errors)))
-    print("Mean % error = {:.5f}%".format(np.mean(model.errors)))
-    print("STD % error = {:.5f}%\n".format(np.std(model.errors)))
-
-    performance = {
-        "Maximum % error": float(np.max(model.errors)),
-        "Mean % error": float(np.mean(model.errors)),
-        "STD % error": float(np.std(model.errors)),
-    }
-
-    with open(
-        str(
-            Path(cfg.train.dpath).joinpath(
-                f"loss_difference_{cfg.target}_prediction_results.yaml",
-            )
-        ),
-        "w",
-    ) as outfile:
-        yaml.dump(performance, outfile)
-
-    Utils.plot_fit(
-        y=model.plot_y,
-        y_hat=model.plot_y_hat,
-        dpath=Path(cfg.train.dpath).joinpath(f"loss_difference_{cfg.target}_fit.png"),
-        target=cfg.target,
-    )
-
-    Utils.write_csv_results(
-        y=model.plot_y,
-        y_hat=model.plot_y_hat,
-        names=model.sample_names,
-        dpath=Path(cfg.train.dpath).joinpath(
-            f"loss_difference_{cfg.target}_prediction_results.csv"
-        ),
-        target=cfg.target,
-    )
-
     print(
-        f"Prediction on target `{cfg.target}` completed ✅:\n🔺 Maximum % error \\= `{np.max(model.errors):.5f}%`\n🔸 Mean % error \\= `{np.mean(model.errors):.5f}%`\n🔹 STD % error \\= `{np.std(model.errors):.5f}%`"
+        f"Prediction on target `{cfg.target}` completed ✅:\n🔺 Maximum % error = `{np.max(model.errors):.5f}%`\n🔸 Mean % error = `{np.mean(model.errors):.5f}%`\n🔹 STD % error = `{np.std(model.errors):.5f}%`"
     )
 
 

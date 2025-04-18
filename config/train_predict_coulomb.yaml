@@ -1,24 +1,24 @@
 atom_types: 3
-cluster: true
+cluster: false
 cluster_num_workers: 8
 coulomb: true
 deterministic: true
 kfold: false
 enlargement_method: padding
 num_workers: 6
-package_path: /home/tommaso/git_workspace/GrapheNet
+package_path: /home/tom/git_workspace/tesi/GrapheNet
 resolution: 1950
-target: electron_affinity
+target: Fermi_energy
 train:
   base_lr: 0.01
   batch_size: 32
   compile: false
-  dpath: ${train.spath}/Coulomb_models_${train.network}/${target}
+  dpath: ${train.spath}/models_${train.network}/${target}
   matmul_precision: high
   num_epochs: 150
-  spath: ${package_path}/data_final/Coulomb_GO/cluster_1000-2000/training_dataset
+  spath: ${package_path}/data/eigen_training_dataset_reference
   grayscale: false
-  network: CoulombNet #CNN, InceptionResNet or Resnet18
+  network: CoulombNet
 
 # SLURM
 slurm_job_name: Coulomb_GrapheNet
@@ -32,4 +32,4 @@ slurm_output: outputs/slurm_out
 slurm_exclude: gn05,gn06,gn07,gn01,gn02
 
 # VERBOSITY
-verbose: True
+verbose: false

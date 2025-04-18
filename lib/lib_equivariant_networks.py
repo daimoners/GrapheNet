@@ -40,7 +40,6 @@ class EquivariantInceptionBlock(nn.Module):
         self.relu5 = e2nn.ReLU(self.output_type)
 
     def forward(self, x):
-
         # Applica i layer convoluzionali
         x1 = self.relu1(self.conv1(x))
         x3 = self.relu3(self.conv3(x))
@@ -158,7 +157,6 @@ class EquivariantInceptionResNet(nn.Module):
         self.dropout = nn.Dropout(0.25)
 
     def forward(self, x):
-
         residual = x
 
         # Primo blocco Inception con batchnorm e downsampling

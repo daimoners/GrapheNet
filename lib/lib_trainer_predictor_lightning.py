@@ -2,7 +2,6 @@ try:
     import torch
     import torch.nn as nn
     import torch.optim
-    import torch.utils.data
     from torch.utils.data import DataLoader
     import pandas as pd
     from pathlib import Path
@@ -19,10 +18,10 @@ try:
         CoulombNet,
     )
     from icecream import ic
-    from matgl.models import M3GNet
-    from lib.lib_equivariant_networks import EquivariantInceptionResNet
     from e2cnn import gspaces
     from e2cnn import nn as e2nn
+    from lib.lib_equivariant_networks import EquivariantInceptionResNet
+    from matgl.models import M3GNet
 
 except Exception as e:
     print(f"Some module are missing from {__file__}: {e}\n")

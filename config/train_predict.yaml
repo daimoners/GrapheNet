@@ -1,12 +1,12 @@
 atom_types: 3
-cluster: true
+cluster: false
 cluster_num_workers: 8
 coulomb: false
 deterministic: true
 enlargement_method: padding
 kfold: false
 num_workers: 6
-package_path: /home/tommaso/git_workspace/GrapheNet
+package_path: /home/tom/git_workspace/tesi/GrapheNet
 resolution: 145
 target: Fermi_energy
 train:
@@ -16,7 +16,7 @@ train:
   dpath: ${train.spath}/models_${train.network}/${target}
   matmul_precision: high
   num_epochs: 150
-  spath: ${package_path}/EQUIVARIANCE/training_dataset_reference
+  spath: ${package_path}/data/png_training_dataset_reference
   grayscale: false
   network: InceptionResNet #CNN, InceptionResNet or Resnet18 or E2InceptionResNet
 
@@ -32,4 +32,4 @@ slurm_output: outputs/slurm_out
 slurm_exclude: gn05,gn06,gn07,gn03,gn04,gn02
 
 # VERBOSITY
-verbose: True
+verbose: false

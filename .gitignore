@@ -23,3 +23,6 @@ paper_plots/
 UMAP/
 test/
 not_published/
+data/
+old_environment.yml
+*.zip

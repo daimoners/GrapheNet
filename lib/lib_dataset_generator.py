@@ -135,7 +135,7 @@ class DatasetGenerator(object):
         self.min_num_atoms = (
             list(cfg.randomly.min_num_atoms) if cfg.randomly.min_num_atoms != 0 else 0
         )
-        self.drop_custom_flag = cfg.randomly.drop_custom
+        self.drop_custom_flag = False  # cfg.randomly.drop_custom
 
         self.augmented_png = cfg.augmented_png
         self.augmented_xyz = cfg.augmented_xyz
