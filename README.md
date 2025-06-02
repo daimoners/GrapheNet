@@ -1,6 +1,6 @@
 # GrapheNet: A Deep Learning Framework for Predicting the Physical and Electronic Properties of Nanographenes Using Images
 
-This is the code used to produce the results presented in the paper called **GrapheNet: A Deep Learning Framework for Predicting the Physical and Electronic Properties of Nanographenes Using Images**.  
+This is the code used to produce the results presented in the paper called [**GrapheNet: A Deep Learning Framework for Predicting the Physical and Electronic Properties of Nanographenes Using Images**](https://doi.org/10.1038/s41598-024-75841-z) (doi: 10.1038/s41598-024-75841-z).  
 The paper is about using computer vision techniques (and in particular convolutional neural networks) to predict the electronic properties of graphene and graphene-oxyde flakes. The neural networks are implemented in `Python` using the `PyTorch` framework. Also the framewrok take care to create the dataset starting from a folder of `.xyz` files and a `.csv` file containing the target properties.
 
 ## Project Structure 
